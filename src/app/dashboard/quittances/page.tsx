@@ -58,7 +58,9 @@ export default function QuittancesPage() {
   }
   const sortedMois = Array.from(grouped.keys()).sort((a, b) => b.localeCompare(a))
 
-  async function handleEnvoyer(quittanceId: string) {
+  async function handleEnvoyer(e: React.MouseEvent, quittanceId: string) {
+    e.preventDefault()
+    e.stopPropagation()
     setSending(quittanceId)
     setMessage(null)
     try {
@@ -120,7 +122,7 @@ export default function QuittancesPage() {
                     const locataire = locatairesMap.get(q.locataire_id)
                     const bien = locataire ? biensMap.get(locataire.bien_id) : null
                     return (
-                      <div key={q.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                      <Link key={q.id} href={`/dashboard/quittances/${q.id}`} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 block hover:shadow-md transition-shadow">
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div>
                             <h3 className="font-semibold text-slate-900">{locataire?.nom ?? '—'}</h3>
@@ -136,7 +138,7 @@ export default function QuittancesPage() {
                         </div>
                         {!q.envoyee && (
                           <button
-                            onClick={() => handleEnvoyer(q.id)}
+                            onClick={(e) => handleEnvoyer(e, q.id)}
                             disabled={sending === q.id}
                             className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
                           >
@@ -148,7 +150,7 @@ export default function QuittancesPage() {
                             {message.text}
                           </p>
                         )}
-                      </div>
+                      </Link>
                     )
                   })}
                 </div>
