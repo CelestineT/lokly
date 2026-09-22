@@ -9,7 +9,6 @@ export async function POST(req: NextRequest) {
 
   const { quittanceId } = await req.json()
 
-  // Récupérer la quittance avec locataire
   const { data: quittance } = await supabase
     .from('quittances')
     .select('*, locataires(nom, email)')
@@ -20,8 +19,7 @@ export async function POST(req: NextRequest) {
 
   const locataire = quittance.locataires as { nom: string; email: string }
 
-  // Créer la demande de signature sur YouTrust
-  const response = await fetch('https://api-sandbox.youtrust.co/v1/signature_requests', {
+  const response = await fetch('https://api.sandbox.youtrust.co/v1/signature_requests', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.YOUTRUST_API_KEY}`,
@@ -45,7 +43,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: data.message ?? 'Erreur YouTrust' }, { status: 500 })
   }
 
-  // Mettre à jour la quittance
   await supabase.from('quittances').update({ envoyee: true }).eq('id', quittanceId)
 
   return NextResponse.json({ success: true, signatureRequestId: data.id })
