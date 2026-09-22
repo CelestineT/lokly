@@ -12,16 +12,24 @@ export async function creerQuittance(formData: FormData) {
     return { error: 'Vous devez être connecté pour créer une quittance.' }
   }
 
+  const locataireId = formData.get('locataire_id') as string
   const loyerHc = Number(formData.get('loyer_hc') ?? 0)
   const charges = Number(formData.get('charges') ?? 0)
   const solde = Number(formData.get('solde') ?? 0)
   const total = loyerHc + charges + solde
-
   const commentaire = formData.get('commentaire') as string
+
+  // Récupérer le bien_id depuis le locataire
+  const { data: locataire } = await supabase
+    .from('locataires')
+    .select('bien_id')
+    .eq('id', locataireId)
+    .single()
 
   const { error } = await supabase.from('quittances').insert({
     proprietaire_id: user.id,
-    locataire_id: formData.get('locataire_id') as string,
+    locataire_id: locataireId,
+    bien_id: locataire?.bien_id ?? null,
     mois: formData.get('mois') as string,
     loyer_hc: loyerHc,
     charges,
