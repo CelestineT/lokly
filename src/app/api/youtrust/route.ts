@@ -128,9 +128,9 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  if (!activateRes.ok) {
+ if (!activateRes.ok) {
     const activateData = await activateRes.json()
-    return NextResponse.json({ error: activateData.message ?? 'Erreur activation' }, { status: 500 })
+    return NextResponse.json({ error: JSON.stringify(activateData) }, { status: 500 })
   }
 
   await supabase.from('quittances').update({ envoyee: true }).eq('id', quittanceId)
