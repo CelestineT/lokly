@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
         first_name: firstName,
         last_name: lastName,
         email: locataire.email,
+        locale: 'fr',
       },
       signature_level: 'electronic_signature',
       signature_authentication_mode: 'no_otp',
