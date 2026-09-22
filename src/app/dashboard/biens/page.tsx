@@ -100,10 +100,21 @@ export default async function BiensPage() {
                   </svg>
                   {bien.adresse}, {bien.code_postal} {bien.ville}
                 </p>
-                <div className="flex gap-4 text-sm text-slate-600">
-                  {bien.surface_m2 != null && <span>{bien.surface_m2} m²</span>}
-                  {bien.nb_pieces != null && <span>{bien.nb_pieces} pièce{bien.nb_pieces !== 1 ? 's' : ''}</span>}
-                  {bien.prix_achat != null && <span>{bien.prix_achat.toLocaleString('fr-FR')} €</span>}
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-4 text-sm text-slate-600">
+                    {bien.surface_m2 != null && <span>{bien.surface_m2} m²</span>}
+                    {bien.nb_pieces != null && <span>{bien.nb_pieces} pièce{bien.nb_pieces !== 1 ? 's' : ''}</span>}
+                    {bien.prix_achat != null && <span>{bien.prix_achat.toLocaleString('fr-FR')} €</span>}
+                  </div>
+                  <Link
+                    href={`/dashboard/biens/${bien.id}/modifier`}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 border border-blue-200 hover:border-blue-400 rounded-lg px-2.5 py-1.5 transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+                    </svg>
+                    Modifier
+                  </Link>
                 </div>
               </div>
             )
