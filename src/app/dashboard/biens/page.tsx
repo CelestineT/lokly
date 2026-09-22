@@ -8,11 +8,14 @@ type Bien = {
   adresse: string
   ville: string
   code_postal: string
-  type: 'appartement' | 'maison' | 'studio' | 'autre'
+  type: 'appartement' | 'maison' | 'studio' | 'immeuble' | 'immeuble_rapport' | 'autre'
   type_location: 'meuble' | 'non_meuble'
   surface_m2: number | null
+  surface_totale_m2: number | null
   nb_pieces: number | null
+  nb_lots: number | null
   prix_achat: number | null
+  annexes: string[]
   created_at: string
 }
 
@@ -20,12 +23,20 @@ const typeBadge: Record<Bien['type'], { label: string; className: string }> = {
   appartement: { label: 'Appartement', className: 'bg-blue-100 text-blue-700' },
   maison: { label: 'Maison', className: 'bg-green-100 text-green-700' },
   studio: { label: 'Studio', className: 'bg-purple-100 text-purple-700' },
+  immeuble: { label: 'Immeuble', className: 'bg-orange-100 text-orange-700' },
+  immeuble_rapport: { label: 'Immeuble de rapport', className: 'bg-rose-100 text-rose-700' },
   autre: { label: 'Autre', className: 'bg-slate-100 text-slate-600' },
 }
 
 const locationBadge: Record<Bien['type_location'], { label: string; className: string }> = {
   meuble: { label: 'Meublé', className: 'bg-amber-100 text-amber-700' },
   non_meuble: { label: 'Non meublé', className: 'bg-slate-100 text-slate-600' },
+}
+
+const ANNEXES_LABELS: Record<string, string> = {
+  cave: 'Cave', parking: 'Parking', garage: 'Garage',
+  cour: 'Cour', jardin: 'Jardin', grenier: 'Grenier',
+  terrasse: 'Terrasse', balcon: 'Balcon',
 }
 
 export default async function BiensPage() {
@@ -82,8 +93,9 @@ export default async function BiensPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {liste.map((bien) => {
-            const tb = typeBadge[bien.type]
+            const tb = typeBadge[bien.type] ?? { label: bien.type, className: 'bg-slate-100 text-slate-600' }
             const lb = locationBadge[bien.type_location]
+            const isImmeuble = bien.type === 'immeuble' || bien.type === 'immeuble_rapport'
             return (
               <div key={bien.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between gap-3 mb-3">
@@ -93,19 +105,30 @@ export default async function BiensPage() {
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${lb.className}`}>{lb.label}</span>
                   </div>
                 </div>
-                <p className="text-sm text-slate-500 flex items-center gap-1.5 mb-4">
+                <p className="text-sm text-slate-500 flex items-center gap-1.5 mb-3">
                   <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                   </svg>
                   {bien.adresse}, {bien.code_postal} {bien.ville}
                 </p>
-                <div className="flex items-center justify-between">
-                  <div className="flex gap-4 text-sm text-slate-600">
-                    {bien.surface_m2 != null && <span>{bien.surface_m2} m²</span>}
-                    {bien.nb_pieces != null && <span>{bien.nb_pieces} pièce{bien.nb_pieces !== 1 ? 's' : ''}</span>}
-                    {bien.prix_achat != null && <span>{bien.prix_achat.toLocaleString('fr-FR')} €</span>}
+                <div className="flex gap-4 text-sm text-slate-600 mb-3">
+                  {isImmeuble && bien.surface_totale_m2 != null && <span>{bien.surface_totale_m2} m² total</span>}
+                  {!isImmeuble && bien.surface_m2 != null && <span>{bien.surface_m2} m²</span>}
+                  {isImmeuble && bien.nb_lots != null && <span>{bien.nb_lots} lots</span>}
+                  {!isImmeuble && bien.nb_pieces != null && <span>{bien.nb_pieces} pièce{bien.nb_pieces !== 1 ? 's' : ''}</span>}
+                  {bien.prix_achat != null && <span>{bien.prix_achat.toLocaleString('fr-FR')} €</span>}
+                </div>
+                {bien.annexes && bien.annexes.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {bien.annexes.map(a => (
+                      <span key={a} className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                        {ANNEXES_LABELS[a] ?? a}
+                      </span>
+                    ))}
                   </div>
+                )}
+                <div className="flex justify-end">
                   <Link
                     href={`/dashboard/biens/${bien.id}/modifier`}
                     className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 border border-blue-200 hover:border-blue-400 rounded-lg px-2.5 py-1.5 transition-colors"

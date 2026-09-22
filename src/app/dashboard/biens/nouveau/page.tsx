@@ -4,21 +4,43 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { ajouterBien } from './actions'
 
+const ANNEXES_OPTIONS = [
+  { value: 'cave', label: 'Cave' },
+  { value: 'parking', label: 'Parking' },
+  { value: 'garage', label: 'Garage' },
+  { value: 'cour', label: 'Cour' },
+  { value: 'jardin', label: 'Jardin' },
+  { value: 'grenier', label: 'Grenier' },
+  { value: 'terrasse', label: 'Terrasse' },
+  { value: 'balcon', label: 'Balcon' },
+]
+
 export default function NouveauBienPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [typeBien, setTypeBien] = useState('')
+  const [annexes, setAnnexes] = useState<string[]>([])
+
+  function toggleAnnexe(value: string) {
+    setAnnexes(prev =>
+      prev.includes(value) ? prev.filter(a => a !== value) : [...prev, value]
+    )
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     setError(null)
     const formData = new FormData(e.currentTarget)
+    annexes.forEach(a => formData.append('annexes', a))
     const result = await ajouterBien(formData)
     if (result?.error) {
       setError(result.error)
       setLoading(false)
     }
   }
+
+  const isImmeuble = typeBien === 'immeuble' || typeBien === 'immeuble_rapport'
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
@@ -64,11 +86,14 @@ export default function NouveauBienPage() {
             <div>
               <label htmlFor="type" className="block text-sm font-medium text-slate-700 mb-1">Type de bien <span className="text-red-500">*</span></label>
               <select id="type" name="type" required defaultValue=""
+                onChange={e => setTypeBien(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                 <option value="" disabled>Choisir…</option>
                 <option value="appartement">Appartement</option>
                 <option value="maison">Maison</option>
                 <option value="studio">Studio</option>
+                <option value="immeuble">Immeuble</option>
+                <option value="immeuble_rapport">Immeuble de rapport</option>
                 <option value="autre">Autre</option>
               </select>
             </div>
@@ -98,6 +123,38 @@ export default function NouveauBienPage() {
               <label htmlFor="prix_achat" className="block text-sm font-medium text-slate-700 mb-1">Prix d&apos;achat (€)</label>
               <input id="prix_achat" name="prix_achat" type="number" min="0" step="1" placeholder="Ex : 250000"
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+
+          {isImmeuble && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="surface_totale_m2" className="block text-sm font-medium text-slate-700 mb-1">Surface totale (m²)</label>
+                <input id="surface_totale_m2" name="surface_totale_m2" type="number" min="1" step="0.01" placeholder="Ex : 350"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label htmlFor="nb_lots" className="block text-sm font-medium text-slate-700 mb-1">Nombre de lots</label>
+                <input id="nb_lots" name="nb_lots" type="number" min="1" step="1" placeholder="Ex : 6"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <p className="block text-sm font-medium text-slate-700 mb-2">Annexes</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {ANNEXES_OPTIONS.map(opt => (
+                <label key={opt.value} className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer text-sm transition-colors ${
+                  annexes.includes(opt.value)
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                }`}>
+                  <input type="checkbox" className="hidden" checked={annexes.includes(opt.value)}
+                    onChange={() => toggleAnnexe(opt.value)} />
+                  {opt.label}
+                </label>
+              ))}
             </div>
           </div>
 
