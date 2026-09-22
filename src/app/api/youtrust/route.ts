@@ -89,11 +89,11 @@ export async function POST(req: NextRequest) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      info: {
-        first_name: locataire.nom.split(' ')[0],
-        last_name: locataire.nom.split(' ').slice(1).join(' ') || locataire.nom,
-        email: locataire.email,
-      },
+  info: {
+    first_name: locataire.nom.split(' ')[0] ?? locataire.nom,
+    last_name: locataire.nom.split(' ').slice(1).join(' ') || 'N/A',
+    email: locataire.email,
+  },
       signature_level: 'electronic_signature',
       signature_authentication_mode: 'no_otp',
     }),
