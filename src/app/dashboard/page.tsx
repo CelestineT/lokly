@@ -1,145 +1,187 @@
-import { createClient } from '@/lib/supabase/server'
-import type { Bien, Locataire, Quittance, Depense, Alerte } from '@/types'
+'use client'
 
-export default async function DashboardPage() {
-  const supabase = await createClient()
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
-  const [biensRes, locatairesRes, quittancesRes, depensesRes, alertesRes] = await Promise.all([
-    supabase.from('biens').select('*').order('created_at', { ascending: false }),
-    supabase.from('locataires').select('*').eq('actif', true),
-    supabase.from('quittances').select('*').order('created_at', { ascending: false }).limit(10),
-    supabase.from('depenses').select('*'),
-    supabase.from('alertes').select('*').eq('lue', false).order('created_at', { ascending: false }),
-  ])
+type Quittance = {
+  id: string
+  locataire_id: string
+  mois: string
+  total: number
+  envoyee: boolean
+}
 
-  const biens: Bien[] = biensRes.data ?? []
-  const locataires: Locataire[] = locatairesRes.data ?? []
-  const quittances: Quittance[] = quittancesRes.data ?? []
-  const depenses: Depense[] = depensesRes.data ?? []
-  const alertes: Alerte[] = alertesRes.data ?? []
+type Locataire = { id: string; nom: string }
 
-  // Calculs KPIs
-  const loyersMensuels = locataires.reduce((s, l) => s + l.loyer_hc + l.charges, 0)
-  const depensesTotales = depenses.reduce((s, d) => s + d.montant, 0)
-  const quittancesNonEnvoyees = quittances.filter(q => !q.envoyee).length
+function formatMois(mois: string): string {
+  const [year, month] = mois.split('-')
+  const date = new Date(Number(year), Number(month) - 1, 1)
+  return date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+    .replace(/^./, (c) => c.toUpperCase())
+}
+
+function getCurrentMois(): string {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  return `${y}-${m}`
+}
+
+export default function DashboardPage() {
+  const [biens, setBiens] = useState(0)
+  const [locataires, setLocataires] = useState(0)
+  const [quittances, setQuittances] = useState<Quittance[]>([])
+  const [locatairesMap, setLocatairesMap] = useState<Map<string, string>>(new Map())
+  const [loading, setLoading] = useState(true)
+
+  const moisCourant = getCurrentMois()
+
+  useEffect(() => {
+    const supabase = createClient()
+    Promise.all([
+      supabase.from('biens').select('id', { count: 'exact', head: true }),
+      supabase.from('locataires').select('id', { count: 'exact', head: true }),
+      supabase.from('quittances').select('id, locataire_id, mois, total, envoyee').order('mois', { ascending: false }).limit(20),
+      supabase.from('locataires').select('id, nom'),
+    ]).then(([biensRes, locatairesRes, quittancesRes, locatairesData]) => {
+      setBiens(biensRes.count ?? 0)
+      setLocataires(locatairesRes.count ?? 0)
+      if (quittancesRes.data) setQuittances(quittancesRes.data)
+      if (locatairesData.data) {
+        setLocatairesMap(new Map((locatairesData.data as Locataire[]).map((l) => [l.id, l.nom])))
+      }
+      setLoading(false)
+    })
+  }, [])
+
+  const quittancesMois = quittances.filter((q) => q.mois === moisCourant)
+  const totalMois = quittancesMois.reduce((sum, q) => sum + q.total, 0)
+  const aEnvoyer = quittancesMois.filter((q) => !q.envoyee).length
+  const tauxEnvoi = quittancesMois.length > 0
+    ? Math.round((quittancesMois.filter((q) => q.envoyee).length / quittancesMois.length) * 100)
+    : 0
+
+  const dernieresQuittances = quittances.slice(0, 5)
+
+  const kpis = [
+    {
+      label: 'Biens',
+      value: loading ? '…' : String(biens),
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+      ),
+      color: 'bg-blue-50 text-blue-600',
+    },
+    {
+      label: 'Locataires actifs',
+      value: loading ? '…' : String(locataires),
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      color: 'bg-violet-50 text-violet-600',
+    },
+    {
+      label: `Loyers ${formatMois(moisCourant)}`,
+      value: loading ? '…' : `${totalMois.toLocaleString('fr-FR')} €`,
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      color: 'bg-emerald-50 text-emerald-600',
+    },
+    {
+      label: 'Quittances à envoyer',
+      value: loading ? '…' : String(aEnvoyer),
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      ),
+      color: aEnvoyer > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-400',
+    },
+    {
+      label: 'Taux d\'envoi ce mois',
+      value: loading ? '…' : `${tauxEnvoi} %`,
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      ),
+      color: tauxEnvoi === 100 ? 'bg-green-50 text-green-600' : 'bg-slate-50 text-slate-500',
+    },
+  ]
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* En-tête */}
-      <div className="mb-6">
-        <h1 className="font-display font-bold text-2xl text-slate-900">Tableau de bord</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Vue d'ensemble de votre patrimoine</p>
+    <div className="p-6 max-w-5xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-slate-900">Tableau de bord</h1>
+        <p className="text-slate-500 text-sm mt-1">{formatMois(moisCourant)}</p>
       </div>
 
-      {/* Alertes */}
-      {alertes.length > 0 && (
-        <div className="mb-6 space-y-2">
-          {alertes.slice(0, 3).map(a => (
-            <div key={a.id} className={`flex items-start gap-3 px-4 py-3 rounded-xl border text-sm ${
-              a.niveau === 'danger' ? 'bg-red-50 border-red-100 text-red-800' :
-              a.niveau === 'warning' ? 'bg-amber-50 border-amber-100 text-amber-800' :
-              'bg-blue-50 border-blue-100 text-blue-800'
-            }`}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-              {a.message}
+      {/* KPIs */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-10">
+        {kpis.map((kpi) => (
+          <div key={kpi.label} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 flex items-center gap-4">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${kpi.color}`}>
+              {kpi.icon}
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KpiCard
-          label="Biens"
-          value={biens.length.toString()}
-          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>}
-        />
-        <KpiCard
-          label="Locataires actifs"
-          value={locataires.length.toString()}
-          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>}
-        />
-        <KpiCard
-          label="Loyers / mois"
-          value={`${loyersMensuels.toFixed(0)} €`}
-          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>}
-          accent
-        />
-        <KpiCard
-          label="Quittances à envoyer"
-          value={quittancesNonEnvoyees.toString()}
-          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>}
-        />
+            <div>
+              <p className="text-xs text-slate-400 font-medium">{kpi.label}</p>
+              <p className="text-2xl font-bold text-slate-900">{kpi.value}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Contenu principal */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Dernières quittances */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <h2 className="font-display font-semibold text-slate-900 mb-4">Dernières quittances</h2>
-          {quittances.length === 0 ? (
-            <EmptyState text="Aucune quittance générée" />
-          ) : (
-            <div className="space-y-2">
-              {quittances.slice(0, 5).map(q => (
-                <div key={q.id} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">{q.mois}</p>
-                    <p className="text-xs text-slate-400">{q.total} €</p>
-                  </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    q.envoyee ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
-                  }`}>
+      {/* Dernières quittances */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Dernières quittances</h2>
+          <Link href="/dashboard/quittances" className="text-xs text-blue-600 hover:underline">
+            Voir tout →
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 bg-slate-100 rounded-2xl animate-pulse" />
+            ))}
+          </div>
+        ) : dernieresQuittances.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 text-center">
+            <p className="text-slate-400 text-sm">Aucune quittance pour le moment</p>
+            <Link href="/dashboard/quittances/nouvelle"
+              className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors mt-4">
+              Créer une quittance
+            </Link>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm divide-y divide-slate-50">
+            {dernieresQuittances.map((q) => (
+              <Link key={q.id} href={`/dashboard/quittances/${q.id}`}
+                className="flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors first:rounded-t-2xl last:rounded-b-2xl">
+                <div>
+                  <p className="font-medium text-slate-900 text-sm">{locatairesMap.get(q.locataire_id) ?? '—'}</p>
+                  <p className="text-xs text-slate-400">{formatMois(q.mois)}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-slate-900 text-sm">{q.total.toLocaleString('fr-FR')} €</span>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${q.envoyee ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
                     {q.envoyee ? 'Envoyée' : 'À envoyer'}
                   </span>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Locataires actifs */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <h2 className="font-display font-semibold text-slate-900 mb-4">Locataires actifs</h2>
-          {locataires.length === 0 ? (
-            <EmptyState text="Aucun locataire enregistré" />
-          ) : (
-            <div className="space-y-2">
-              {locataires.slice(0, 5).map(l => (
-                <div key={l.id} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">{l.nom}</p>
-                    <p className="text-xs text-slate-400">{l.mode_paiement}</p>
-                  </div>
-                  <span className="text-sm font-semibold text-slate-700">{(l.loyer_hc + l.charges).toFixed(0)} €</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
-  )
-}
-
-function KpiCard({ label, value, icon, accent }: {
-  label: string; value: string; icon: React.ReactNode; accent?: boolean
-}) {
-  return (
-    <div className={`rounded-2xl border p-4 ${accent ? 'bg-blue-600 border-blue-500' : 'bg-white border-slate-100'} shadow-sm`}>
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${accent ? 'bg-white/20 text-green-300' : 'bg-blue-50 text-blue-600'}`}>
-        {icon}
-      </div>
-      <p className={`text-2xl font-display font-bold ${accent ? 'text-white' : 'text-slate-900'}`}>{value}</p>
-      <p className={`text-xs mt-0.5 ${accent ? 'text-white/70' : 'text-slate-500'}`}>{label}</p>
-    </div>
-  )
-}
-
-function EmptyState({ text }: { text: string }) {
-  return (
-    <div className="text-center py-8 text-sm text-slate-400">{text}</div>
   )
 }
