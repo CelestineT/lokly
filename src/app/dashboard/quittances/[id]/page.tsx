@@ -4,24 +4,25 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
-export default function QuittanceDetailPage({ params }: { params: { id: string } }) {
+export default function QuittanceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [quittance, setQuittance] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchQuittance = async () => {
       const supabase = createClient()
+      const { id } = await params
       const { data, error } = await supabase
         .from('quittances')
         .select('*, locataires(nom, email), biens(adresse, ville)')
-        .eq('id', params.id)
+        .eq('id', id)
         .maybeSingle()
       console.log('data:', data, 'error:', error)
       setQuittance(data)
       setLoading(false)
     }
     fetchQuittance()
-  }, [params.id])
+  }, [params])
 
   if (loading) return <div className="p-6">Chargement...</div>
   if (!quittance) return <div className="p-6">Quittance introuvable. (id: {params.id})</div>
