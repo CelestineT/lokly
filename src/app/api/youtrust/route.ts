@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
 
   // Étape 2 : Uploader le document PDF
   const formData = new FormData()
-  formData.append('file', new Blob([pdfBytes], { type: 'application/pdf' }), `quittance-${quittance.mois}.pdf`)
+  formData.append('file', new Blob([Buffer.from(pdfBytes)], { type: 'application/pdf' }), `quittance-${quittance.mois}.pdf`)
   formData.append('nature', 'signable_document')
 
   const docRes = await fetch(`https://api-sandbox.yousign.app/v3/signature_requests/${signatureRequestId}/documents`, {
