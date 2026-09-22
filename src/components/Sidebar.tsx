@@ -1,4 +1,3 @@
-@'
 'use client'
 
 import Link from 'next/link'
@@ -141,4 +140,3 @@ export default function Sidebar() {
     </>
   )
 }
-'@ | Set-Content -Path src\components\Sidebar.tsx -Encoding UTF8
