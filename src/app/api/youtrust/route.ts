@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
-
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
 
@@ -19,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   const locataire = quittance.locataires as { nom: string; email: string }
 
-  const response = await fetch('https://api.sandbox.youtrust.co/v1/signature_requests', {
+  const response = await fetch('https://api-sandbox.yousign.app/v3/signature_requests', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.YOUTRUST_API_KEY}`,
@@ -27,13 +26,7 @@ export async function POST(req: NextRequest) {
     },
     body: JSON.stringify({
       name: `Quittance ${quittance.mois} - ${locataire.nom}`,
-      signers: [
-        {
-          email: locataire.email,
-          first_name: locataire.nom.split(' ')[0],
-          last_name: locataire.nom.split(' ').slice(1).join(' ') || locataire.nom,
-        }
-      ],
+      delivery_mode: 'email',
     }),
   })
 
@@ -44,6 +37,5 @@ export async function POST(req: NextRequest) {
   }
 
   await supabase.from('quittances').update({ envoyee: true }).eq('id', quittanceId)
-
   return NextResponse.json({ success: true, signatureRequestId: data.id })
 }
