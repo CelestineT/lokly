@@ -20,7 +20,6 @@ export async function POST(req: NextRequest) {
   const locataire = quittance.locataires as { nom: string; email: string }
   const bien = quittance.biens as { adresse: string; ville: string }
 
-  // Récupérer le nom du propriétaire
   const { data: profile } = await supabase
     .from('profiles')
     .select('full_name')
@@ -29,7 +28,6 @@ export async function POST(req: NextRequest) {
 
   const proprietaireNom = profile?.full_name ?? 'Le propriétaire'
 
-  // Générer le PDF
   const pdfBytes = await generateQuittancePdf({
     locataireNom: locataire.nom,
     locataireEmail: locataire.email,
@@ -81,7 +79,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: docData.message ?? 'Erreur upload document' }, { status: 500 })
   }
 
-  // Étape 3 : Ajouter le signataire
+  const documentId = docData.id
+
+  // Étape 3 : Ajouter le signataire avec zone de signature
+  const firstName = locataire.nom.split(' ')[0] ?? locataire.nom
+  const lastName = locataire.nom.split(' ').slice(1).join(' ') || firstName
+
   const signerRes = await fetch(`https://api-sandbox.yousign.app/v3/signature_requests/${signatureRequestId}/signers`, {
     method: 'POST',
     headers: {
@@ -89,19 +92,30 @@ export async function POST(req: NextRequest) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-  info: {
-    first_name: locataire.nom.split(' ')[0] ?? locataire.nom,
-    last_name: locataire.nom.split(' ').slice(1).join(' ') || 'N/A',
-    email: locataire.email,
-  },
+      info: {
+        first_name: firstName,
+        last_name: lastName,
+        email: locataire.email,
+      },
       signature_level: 'electronic_signature',
       signature_authentication_mode: 'no_otp',
+      fields: [
+        {
+          document_id: documentId,
+          type: 'signature',
+          page: 1,
+          x: 50,
+          y: 50,
+          width: 200,
+          height: 50,
+        }
+      ],
     }),
   })
 
   const signerData = await signerRes.json()
   if (!signerRes.ok) {
-    return NextResponse.json({ error: signerData.message ?? 'Erreur ajout signataire' }, { status: 500 })
+    return NextResponse.json({ error: JSON.stringify(signerData) }, { status: 500 })
   }
 
   // Étape 4 : Activer la demande de signature
@@ -118,7 +132,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: activateData.message ?? 'Erreur activation' }, { status: 500 })
   }
 
-  // Mettre à jour la quittance
   await supabase.from('quittances').update({ envoyee: true }).eq('id', quittanceId)
 
   return NextResponse.json({ success: true, signatureRequestId })
