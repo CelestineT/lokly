@@ -138,8 +138,7 @@ async function generateQuittancePdf(params: {
   y -= 40
 
   // Texte légal
-  const formatEur = (n: number) => n.toLocaleString('fr-FR').replace(/ /g, ' ').replace(/ /g, ' ')
-  const legal = `Je soussigne(e), ${params.proprietaireNom}, proprietaire du logement designe ci-dessus, declare avoir recu de ${params.locataireNom} la somme de ${formatEur(params.total)} EUR au titre du loyer et des charges du mois de ${formatMois(params.mois)}, et lui en donne quittance, sous reserve de tous mes droits.`
+  const legal = `Je soussigne(e), ${params.proprietaireNom}, proprietaire du logement designe ci-dessus, declare avoir recu de ${params.locataireNom} la somme de ${eur(params.total)} au titre du loyer et des charges du mois de ${formatMois(params.mois)}, et lui en donne quittance, sous reserve de tous mes droits.`
 
   // Wrap text
   const maxWidth = width - 100

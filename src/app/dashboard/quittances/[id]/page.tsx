@@ -457,7 +457,7 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
             ) : (
               <div className="space-y-2">
                 <p className="text-sm text-center text-amber-700 font-medium">Créer un avoir pour annuler cette quittance ?</p>
-                <p className="text-xs text-center text-slate-500">Un avoir sera généré et envoyé au locataire.</p>
+                <p className="text-xs text-center text-slate-500">La quittance sera annulée et pourra être re-signée.</p>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setAvoirConfirm(false)}
@@ -479,7 +479,7 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
         )}
         {avoirDone && (
           <div className="pt-2 border-t border-slate-100 text-center">
-            <p className="text-sm text-green-600 font-medium">✓ Avoir émis et envoyé au locataire.</p>
+            <p className="text-sm text-green-600 font-medium">✓ Quittance annulée. Vous pouvez la re-signer.</p>
           </div>
         )}
 
