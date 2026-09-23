@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Lokly <noreply@lokly.fr>',
+        from: 'Lokly <onboarding@resend.dev>',
         to: [user.email!],
         subject: `Code de confirmation : ${code}`,
         html: `
