@@ -270,7 +270,7 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
               onClick={() => setStep('sign')}
               className="w-full inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-3 text-sm font-medium hover:bg-blue-700 transition-colors"
             >
-              ✍️ Signer et envoyer au locataire
+              ✍🏿 Signer et envoyer au locataire
             </button>
           </div>
         )}

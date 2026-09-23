@@ -2,12 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
+const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
+
 function formatMois(mois: string): string {
   const [year, month] = mois.split('-')
-  const date = new Date(Number(year), Number(month) - 1, 1)
-  return date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
-    .replace(/ /g, ' ').replace(/ /g, ' ')
-    .replace(/^./, (c) => c.toUpperCase())
+  const m = MOIS_FR[Number(month) - 1]
+  return `${m.charAt(0).toUpperCase()}${m.slice(1)} ${year}`
+}
+
+function formatDateSignature(date: Date): string {
+  const j = String(date.getDate()).padStart(2, '0')
+  const m = MOIS_FR[date.getMonth()]
+  const y = date.getFullYear()
+  return `${j} ${m} ${y}`
 }
 
 async function generateQuittancePdf(params: {
@@ -233,9 +240,7 @@ export async function POST(req: NextRequest) {
       ? `${profile.prenom ?? ''} ${profile.nom ?? ''}`.trim() || user.email!
       : user.email!
 
-    const dateSignature = new Date().toLocaleDateString('fr-FR', {
-      day: '2-digit', month: 'long', year: 'numeric',
-    }).replace(/ /g, ' ').replace(/ /g, ' ')
+    const dateSignature = formatDateSignature(new Date())
 
     // Générer le PDF
     const pdfBytes = await generateQuittancePdf({
