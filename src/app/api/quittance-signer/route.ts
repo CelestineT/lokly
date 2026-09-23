@@ -91,8 +91,12 @@ async function generateQuittancePdf(params: {
   })
   y -= 30
 
-  // Helper montants sans espaces insécables
-  const eur = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' EUR'
+  // Helper montants : séparateur espace simple, pas d'espace insécable
+  const eur = (n: number) => {
+    const parts = Math.abs(n).toString().split('.')
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+    return (n < 0 ? '-' : '') + parts.join(',') + ' EUR'
+  }
 
   // Détail financier
   page.drawText('DETAIL DU REGLEMENT', { x: 50, y, size: 8, font: fontBold, color: bleu })
@@ -161,21 +165,26 @@ async function generateQuittancePdf(params: {
   y -= 10
 
   // Embed signature image
-  if (params.signatureDataUrl && params.signatureDataUrl.startsWith('data:image/png;base64,')) {
+  if (params.signatureDataUrl && params.signatureDataUrl.includes('base64,')) {
     try {
-      const base64 = params.signatureDataUrl.split(',')[1]
-      const sigBytes = Buffer.from(base64, 'base64')
-      const sigImage = await pdfDoc.embedPng(sigBytes)
-      const sigDims = sigImage.scale(0.4)
-      page.drawImage(sigImage, {
-        x: 50,
-        y: y - sigDims.height,
-        width: sigDims.width,
-        height: sigDims.height,
-      })
+      const base64 = params.signatureDataUrl.split('base64,')[1]
+      if (base64 && base64.length > 100) {
+        const sigBytes = Buffer.from(base64, 'base64')
+        const sigImage = await pdfDoc.embedPng(sigBytes)
+        const sigDims = sigImage.scaleToFit(200, 80)
+        page.drawImage(sigImage, {
+          x: 50,
+          y: y - sigDims.height,
+          width: sigDims.width,
+          height: sigDims.height,
+        })
+      } else {
+        // Pas de signature valide : dessiner un rectangle vide
+        page.drawRectangle({ x: 50, y: y - 60, width: 200, height: 60, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 1 })
+      }
     } catch (e) {
       console.error('Erreur embed signature PNG:', e)
-      // On continue sans la signature image plutôt que de planter
+      page.drawRectangle({ x: 50, y: y - 60, width: 200, height: 60, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 1 })
     }
   }
 
@@ -271,11 +280,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email locataire introuvable' }, { status: 400 })
     }
 
-    // Mode test : envoi email désactivé (domaine Resend non vérifié)
-    // Le PDF est généré et la quittance est marquée comme signée
-    // À réactiver quand un domaine sera vérifié dans Resend
-    console.log(`[MODE TEST] PDF généré pour ${locataireEmail} — email non envoyé`)
-    console.log(`[MODE TEST] Fichier : ${fileName}, taille : ${pdfBytes.length} bytes`)
+    // Mode test : envoi forcé vers synteyapartners@gmail.com (seule adresse autorisée par Resend sans domaine vérifié)
+    const emailDest = 'synteyapartners@gmail.com'
+    console.log(`[MODE TEST] Envoi PDF vers ${emailDest} (locataire réel : ${locataireEmail})`)
+
+    const resendRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'Lokly <onboarding@resend.dev>',
+        to: [emailDest],
+        subject: `[TEST] Quittance de loyer — ${formatMois(quittance.mois)}`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+            <p style="color: #ef4444; font-size: 12px; margin-bottom: 16px;">[MODE TEST — en production sera envoyé à : ${locataireEmail}]</p>
+            <h2 style="color: #1e293b; margin-bottom: 8px;">Quittance de loyer</h2>
+            <p style="color: #64748b; margin-bottom: 24px;">
+              Bonjour ${quittance.locataires?.nom ?? ''},<br/>
+              Veuillez trouver ci-joint votre quittance de loyer pour <strong>${formatMois(quittance.mois)}</strong>.
+            </p>
+            <div style="background: #f1f5f9; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+              <p style="margin: 0; color: #1e293b; font-weight: 600;">Montant total : ${quittance.total} EUR</p>
+              <p style="margin: 4px 0 0; color: #64748b; font-size: 13px;">${quittance.biens?.nom ?? ''} — ${quittance.biens?.ville ?? ''}</p>
+            </div>
+          </div>
+        `,
+        attachments: [{ filename: fileName, content: pdfBase64 }],
+      }),
+    })
+
+    if (!resendRes.ok) {
+      const resendError = await resendRes.json()
+      console.error('Resend error:', resendError)
+      // Non bloquant en mode test
+    }
 
     // Mettre à jour la quittance comme envoyée + date_signature
     await supabase
