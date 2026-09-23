@@ -68,16 +68,21 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
     })
   }, [params])
 
-  // Canvas signature helpers
+  // Canvas signature helpers — corrige le ratio entre taille CSS et taille interne du canvas
   function getPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
     const rect = canvas.getBoundingClientRect()
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
     if ('touches' in e) {
       return {
-        x: e.touches[0].clientX - rect.left,
-        y: e.touches[0].clientY - rect.top,
+        x: (e.touches[0].clientX - rect.left) * scaleX,
+        y: (e.touches[0].clientY - rect.top) * scaleY,
       }
     }
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    }
   }
 
   function startDraw(e: React.MouseEvent | React.TouchEvent) {
@@ -120,7 +125,17 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
   }
 
   function getSignatureDataUrl(): string {
-    return canvasRef.current?.toDataURL('image/png') ?? ''
+    const canvas = canvasRef.current
+    if (!canvas) return ''
+    // Créer un canvas temporaire avec fond blanc pour que la signature soit visible dans le PDF
+    const tmp = document.createElement('canvas')
+    tmp.width = canvas.width
+    tmp.height = canvas.height
+    const ctx = tmp.getContext('2d')!
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, tmp.width, tmp.height)
+    ctx.drawImage(canvas, 0, 0)
+    return tmp.toDataURL('image/png')
   }
 
   async function handleValiderSignature() {
