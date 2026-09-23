@@ -91,11 +91,16 @@ async function generateQuittancePdf(params: {
   })
   y -= 30
 
-  // Helper montants : séparateur espace simple, pas d'espace insécable
+  // Helper montants : séparateur espace ASCII 0x20 uniquement
   const eur = (n: number) => {
-    const parts = Math.abs(n).toString().split('.')
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-    return (n < 0 ? '-' : '') + parts.join(',') + ' EUR'
+    const abs = Math.abs(n)
+    const str = abs.toFixed(0)
+    let formatted = ''
+    for (let i = 0; i < str.length; i++) {
+      if (i > 0 && (str.length - i) % 3 === 0) formatted += '\x20'
+      formatted += str[i]
+    }
+    return (n < 0 ? '-' : '') + formatted + '\x20EUR'
   }
 
   // Détail financier
@@ -169,22 +174,40 @@ async function generateQuittancePdf(params: {
     try {
       const base64 = params.signatureDataUrl.split('base64,')[1]
       if (base64 && base64.length > 100) {
+        // Le canvas HTML a un fond transparent → on convertit via une image JPEG avec fond blanc
+        // en recréant les bytes PNG tels quels (pdf-lib supporte PNG avec transparence)
         const sigBytes = Buffer.from(base64, 'base64')
-        const sigImage = await pdfDoc.embedPng(sigBytes)
-        const sigDims = sigImage.scaleToFit(200, 80)
-        page.drawImage(sigImage, {
-          x: 50,
-          y: y - sigDims.height,
-          width: sigDims.width,
-          height: sigDims.height,
-        })
+        // On tente d'abord PNG, si échec on dessine le rectangle
+        let embedded = false
+        try {
+          const sigImage = await pdfDoc.embedPng(sigBytes)
+          const sigDims = sigImage.scaleToFit(220, 90)
+          // Fond blanc derrière la signature
+          page.drawRectangle({
+            x: 50, y: y - sigDims.height,
+            width: sigDims.width, height: sigDims.height,
+            color: rgb(1, 1, 1),
+          })
+          page.drawImage(sigImage, {
+            x: 50,
+            y: y - sigDims.height,
+            width: sigDims.width,
+            height: sigDims.height,
+          })
+          embedded = true
+        } catch (pngErr) {
+          console.error('embedPng failed:', pngErr)
+        }
+        if (!embedded) {
+          page.drawRectangle({ x: 50, y: y - 80, width: 220, height: 80, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 1 })
+          page.drawText('(signature non disponible)', { x: 60, y: y - 44, size: 9, font: fontRegular, color: gris })
+        }
       } else {
-        // Pas de signature valide : dessiner un rectangle vide
-        page.drawRectangle({ x: 50, y: y - 60, width: 200, height: 60, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 1 })
+        page.drawRectangle({ x: 50, y: y - 80, width: 220, height: 80, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 1 })
       }
     } catch (e) {
       console.error('Erreur embed signature PNG:', e)
-      page.drawRectangle({ x: 50, y: y - 60, width: 200, height: 60, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 1 })
+      page.drawRectangle({ x: 50, y: y - 80, width: 220, height: 80, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 1 })
     }
   }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 type Quittance = {
@@ -39,11 +40,16 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
   const [otpError, setOtpError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [avoirConfirm, setAvoirConfirm] = useState(false)
+  const [avoirDone, setAvoirDone] = useState(false)
   const [isDrawing, setIsDrawing] = useState(false)
   const [hasSignature, setHasSignature] = useState(false)
   const [savedSignatureUrl, setSavedSignatureUrl] = useState<string>('')
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const lastPos = useRef<{ x: number; y: number } | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
     params.then(({ id }) => {
@@ -135,6 +141,42 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
         setStep('otp')
       } else {
         setMessage({ text: data.error ?? 'Erreur envoi OTP', ok: false })
+      }
+    } catch {
+      setMessage({ text: 'Erreur réseau', ok: false })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!resolvedId) return
+    setDeleting(true)
+    const supabase = createClient()
+    const { error } = await supabase.from('quittances').delete().eq('id', resolvedId)
+    if (error) {
+      setMessage({ text: 'Erreur lors de la suppression', ok: false })
+      setDeleting(false)
+    } else {
+      router.push('/dashboard/quittances')
+    }
+  }
+
+  async function handleAvoir() {
+    if (!resolvedId) return
+    setSending(true)
+    try {
+      const res = await fetch('/api/quittance-avoir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quittanceId: resolvedId }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setAvoirDone(true)
+        setAvoirConfirm(false)
+      } else {
+        setMessage({ text: data.error ?? 'Erreur création avoir', ok: false })
       }
     } catch {
       setMessage({ text: 'Erreur réseau', ok: false })
@@ -283,7 +325,7 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
               <canvas
                 ref={canvasRef}
                 width={560}
-                height={160}
+                height={220}
                 className="w-full touch-none cursor-crosshair"
                 onMouseDown={startDraw}
                 onMouseMove={draw}
@@ -351,6 +393,83 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
             <p className="font-semibold text-slate-900">Quittance signée et envoyée !</p>
             <p className="text-sm text-slate-500">Le locataire a reçu la quittance par email.</p>
           </div>
+        )}
+
+        {/* Suppression (quittance non envoyée uniquement) */}
+        {!quittance.envoyee && step === 'view' && (
+          <div className="pt-2 border-t border-slate-100">
+            {!deleteConfirm ? (
+              <button
+                onClick={() => setDeleteConfirm(true)}
+                className="w-full text-sm text-red-500 hover:text-red-700 py-2 transition-colors"
+              >
+                Supprimer cette quittance
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-center text-red-600 font-medium">Confirmer la suppression ?</p>
+                <p className="text-xs text-center text-slate-500">Cette action est irréversible.</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setDeleteConfirm(false)}
+                    className="flex-1 border border-slate-200 text-slate-600 rounded-xl px-4 py-2 text-sm font-medium hover:bg-slate-50 transition-colors"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="flex-1 bg-red-500 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
+                  >
+                    {deleting ? 'Suppression…' : 'Supprimer'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Avoir (quittance déjà envoyée) */}
+        {quittance.envoyee && step !== 'done' && !avoirDone && (
+          <div className="pt-2 border-t border-slate-100">
+            {!avoirConfirm ? (
+              <button
+                onClick={() => setAvoirConfirm(true)}
+                className="w-full text-sm text-amber-600 hover:text-amber-800 py-2 transition-colors"
+              >
+                Émettre un avoir / annuler cette quittance
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-center text-amber-700 font-medium">Créer un avoir pour annuler cette quittance ?</p>
+                <p className="text-xs text-center text-slate-500">Un avoir sera généré et envoyé au locataire.</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setAvoirConfirm(false)}
+                    className="flex-1 border border-slate-200 text-slate-600 rounded-xl px-4 py-2 text-sm font-medium hover:bg-slate-50 transition-colors"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={handleAvoir}
+                    disabled={sending}
+                    className="flex-1 bg-amber-500 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-amber-600 transition-colors disabled:opacity-50"
+                  >
+                    {sending ? 'Création…' : 'Confirmer'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {avoirDone && (
+          <div className="pt-2 border-t border-slate-100 text-center">
+            <p className="text-sm text-green-600 font-medium">✓ Avoir émis et envoyé au locataire.</p>
+          </div>
+        )}
+
+        {message && step === 'view' && (
+          <p className="text-xs text-center text-red-500">{message.text}</p>
         )}
       </div>
     </div>
