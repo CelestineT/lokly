@@ -41,6 +41,7 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [hasSignature, setHasSignature] = useState(false)
+  const [savedSignatureUrl, setSavedSignatureUrl] = useState<string>('')
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const lastPos = useRef<{ x: number; y: number } | null>(null)
 
@@ -118,6 +119,8 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
 
   async function handleValiderSignature() {
     if (!hasSignature || !resolvedId) return
+    const signatureDataUrl = getSignatureDataUrl()
+    setSavedSignatureUrl(signatureDataUrl)
     setSending(true)
     setMessage(null)
     try {
@@ -144,12 +147,11 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
     if (!otp || !resolvedId) return
     setSending(true)
     setOtpError(null)
-    const signatureDataUrl = getSignatureDataUrl()
     try {
       const res = await fetch('/api/quittance-signer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quittanceId: resolvedId, otp, signatureDataUrl }),
+        body: JSON.stringify({ quittanceId: resolvedId, otp, signatureDataUrl: savedSignatureUrl }),
       })
       const data = await res.json()
       if (res.ok) {
