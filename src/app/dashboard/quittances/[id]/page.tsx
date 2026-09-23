@@ -35,6 +35,7 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
   const [resolvedId, setResolvedId] = useState<string | null>(null)
   const [step, setStep] = useState<Step>('view')
   const [otp, setOtp] = useState('')
+  const [otpDisplay, setOtpDisplay] = useState<string | null>(null)
   const [otpError, setOtpError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
@@ -127,6 +128,7 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
       })
       const data = await res.json()
       if (res.ok) {
+        if (data.code) setOtpDisplay(data.code)
         setStep('otp')
       } else {
         setMessage({ text: data.error ?? 'Erreur envoi OTP', ok: false })
@@ -310,7 +312,13 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
         {/* Étape 2 : Saisie OTP */}
         {step === 'otp' && (
           <div className="pt-2 space-y-3">
-            <p className="text-sm font-medium text-slate-700">Un code de confirmation a été envoyé à votre email. Saisissez-le ci-dessous :</p>
+            <p className="text-sm font-medium text-slate-700">Saisissez le code de confirmation :</p>
+            {otpDisplay && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
+                <p className="text-xs text-blue-500 mb-1">Votre code (mode test)</p>
+                <p className="text-2xl font-bold tracking-widest text-blue-700">{otpDisplay}</p>
+              </div>
+            )}
             <input
               type="text"
               value={otp}
