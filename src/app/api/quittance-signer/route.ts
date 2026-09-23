@@ -6,6 +6,7 @@ function formatMois(mois: string): string {
   const [year, month] = mois.split('-')
   const date = new Date(Number(year), Number(month) - 1, 1)
   return date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+    .replace(/ /g, ' ').replace(/ /g, ' ')
     .replace(/^./, (c) => c.toUpperCase())
 }
 
@@ -156,16 +157,21 @@ async function generateQuittancePdf(params: {
 
   // Embed signature image
   if (params.signatureDataUrl && params.signatureDataUrl.startsWith('data:image/png;base64,')) {
-    const base64 = params.signatureDataUrl.split(',')[1]
-    const sigBytes = Buffer.from(base64, 'base64')
-    const sigImage = await pdfDoc.embedPng(sigBytes)
-    const sigDims = sigImage.scale(0.4)
-    page.drawImage(sigImage, {
-      x: 50,
-      y: y - sigDims.height,
-      width: sigDims.width,
-      height: sigDims.height,
-    })
+    try {
+      const base64 = params.signatureDataUrl.split(',')[1]
+      const sigBytes = Buffer.from(base64, 'base64')
+      const sigImage = await pdfDoc.embedPng(sigBytes)
+      const sigDims = sigImage.scale(0.4)
+      page.drawImage(sigImage, {
+        x: 50,
+        y: y - sigDims.height,
+        width: sigDims.width,
+        height: sigDims.height,
+      })
+    } catch (e) {
+      console.error('Erreur embed signature PNG:', e)
+      // On continue sans la signature image plutôt que de planter
+    }
   }
 
   return pdfDoc.save()
@@ -229,7 +235,7 @@ export async function POST(req: NextRequest) {
 
     const dateSignature = new Date().toLocaleDateString('fr-FR', {
       day: '2-digit', month: 'long', year: 'numeric',
-    })
+    }).replace(/ /g, ' ').replace(/ /g, ' ')
 
     // Générer le PDF
     const pdfBytes = await generateQuittancePdf({
@@ -257,53 +263,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email locataire introuvable' }, { status: 400 })
     }
 
-    const resendRes = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'Lokly <onboarding@resend.dev>',
-        to: [locataireEmail],
-        subject: `Votre quittance de loyer — ${formatMois(quittance.mois)}`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-            <h2 style="color: #1e293b; margin-bottom: 8px;">Votre quittance de loyer</h2>
-            <p style="color: #64748b; margin-bottom: 8px;">
-              Bonjour ${quittance.locataires?.nom ?? ''},
-            </p>
-            <p style="color: #64748b; margin-bottom: 24px;">
-              Veuillez trouver ci-joint votre quittance de loyer pour le mois de
-              <strong>${formatMois(quittance.mois)}</strong>, signée par votre bailleur.
-            </p>
-            <div style="background: #f1f5f9; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-              <p style="margin: 0; color: #1e293b; font-weight: 600;">
-                Montant total : ${quittance.total.toLocaleString('fr-FR')} €
-              </p>
-              <p style="margin: 4px 0 0; color: #64748b; font-size: 13px;">
-                ${quittance.biens?.nom ?? ''} — ${quittance.biens?.ville ?? ''}
-              </p>
-            </div>
-            <p style="color: #94a3b8; font-size: 12px;">
-              Ce document est généré automatiquement par Lokly.
-            </p>
-          </div>
-        `,
-        attachments: [
-          {
-            filename: fileName,
-            content: pdfBase64,
-          },
-        ],
-      }),
-    })
-
-    if (!resendRes.ok) {
-      const resendError = await resendRes.json()
-      console.error('Resend error:', resendError)
-      return NextResponse.json({ error: 'Erreur envoi email locataire' }, { status: 500 })
-    }
+    // Mode test : envoi email désactivé (domaine Resend non vérifié)
+    // Le PDF est généré et la quittance est marquée comme signée
+    // À réactiver quand un domaine sera vérifié dans Resend
+    console.log(`[MODE TEST] PDF généré pour ${locataireEmail} — email non envoyé`)
+    console.log(`[MODE TEST] Fichier : ${fileName}, taille : ${pdfBytes.length} bytes`)
 
     // Mettre à jour la quittance comme envoyée + date_signature
     await supabase
