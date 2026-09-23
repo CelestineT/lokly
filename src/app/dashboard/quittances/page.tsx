@@ -31,8 +31,6 @@ export default function QuittancesPage() {
   const [quittances, setQuittances] = useState<Quittance[]>([])
   const [locataires, setLocataires] = useState<Locataire[]>([])
   const [biens, setBiens] = useState<Bien[]>([])
-  const [sending, setSending] = useState<string | null>(null)
-  const [message, setMessage] = useState<{ id: string; text: string; ok: boolean } | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -57,31 +55,6 @@ export default function QuittancesPage() {
     grouped.set(q.mois, list)
   }
   const sortedMois = Array.from(grouped.keys()).sort((a, b) => b.localeCompare(a))
-
-  async function handleEnvoyer(e: React.MouseEvent, quittanceId: string) {
-    e.preventDefault()
-    e.stopPropagation()
-    setSending(quittanceId)
-    setMessage(null)
-    try {
-      const res = await fetch('/api/youtrust', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quittanceId }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setQuittances((prev) => prev.map((q) => q.id === quittanceId ? { ...q, envoyee: true } : q))
-        setMessage({ id: quittanceId, text: 'Envoyée pour signature !', ok: true })
-      } else {
-        setMessage({ id: quittanceId, text: data.error ?? 'Erreur lors de l\'envoi', ok: false })
-      }
-    } catch {
-      setMessage({ id: quittanceId, text: 'Erreur réseau', ok: false })
-    } finally {
-      setSending(null)
-    }
-  }
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -129,7 +102,7 @@ export default function QuittancesPage() {
                             {bien && <p className="text-xs text-slate-400">{bien.nom} — {bien.ville}</p>}
                           </div>
                           <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${q.envoyee ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {q.envoyee ? 'Envoyée' : 'À envoyer'}
+                            {q.envoyee ? 'Envoyée' : 'À signer'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-sm mt-3 pt-3 border-t border-slate-50">
@@ -137,18 +110,9 @@ export default function QuittancesPage() {
                           <span className="text-slate-400 text-xs">{q.loyer_hc.toLocaleString('fr-FR')} HC + {q.charges.toLocaleString('fr-FR')} charges</span>
                         </div>
                         {!q.envoyee && (
-                          <button
-                            onClick={(e) => handleEnvoyer(e, q.id)}
-                            disabled={sending === q.id}
-                            className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
-                          >
-                            {sending === q.id ? 'Envoi en cours…' : '✉ Signer et envoyer'}
-                          </button>
-                        )}
-                        {message?.id === q.id && (
-                          <p className={`mt-2 text-xs text-center font-medium ${message.ok ? 'text-green-600' : 'text-red-500'}`}>
-                            {message.text}
-                          </p>
+                          <div className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium">
+                            ✍️ Signer et envoyer
+                          </div>
                         )}
                       </Link>
                     )
