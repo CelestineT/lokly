@@ -91,30 +91,29 @@ async function generateQuittancePdf(params: {
   })
   y -= 30
 
+  // Helper montants sans espaces insécables
+  const eur = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' EUR'
+
   // Détail financier
-  page.drawText('DÉTAIL DU RÈGLEMENT', { x: 50, y, size: 8, font: fontBold, color: bleu })
+  page.drawText('DETAIL DU REGLEMENT', { x: 50, y, size: 8, font: fontBold, color: bleu })
   y -= 20
 
   // Loyer HC
   page.drawText('Loyer hors charges', { x: 50, y, size: 10, font: fontRegular, color: gris })
-  page.drawText(`${params.loyerHc.toLocaleString('fr-FR')} €`, {
-    x: width - 50 - 60, y, size: 10, font: fontRegular, color: noir,
-  })
+  page.drawText(eur(params.loyerHc), { x: width - 50 - 80, y, size: 10, font: fontRegular, color: noir })
   y -= 18
 
   // Charges
   page.drawText('Charges', { x: 50, y, size: 10, font: fontRegular, color: gris })
-  page.drawText(`${params.charges.toLocaleString('fr-FR')} €`, {
-    x: width - 50 - 60, y, size: 10, font: fontRegular, color: noir,
-  })
+  page.drawText(eur(params.charges), { x: width - 50 - 80, y, size: 10, font: fontRegular, color: noir })
   y -= 18
 
   // Solde si non nul
   if (params.solde !== 0) {
     page.drawText('Solde', { x: 50, y, size: 10, font: fontRegular, color: gris })
     const soldeColor = params.solde < 0 ? rgb(0.8, 0.15, 0.15) : rgb(0.1, 0.65, 0.35)
-    page.drawText(`${params.solde > 0 ? '+' : ''}${params.solde.toLocaleString('fr-FR')} €`, {
-      x: width - 50 - 60, y, size: 10, font: fontRegular, color: soldeColor,
+    page.drawText(`${params.solde > 0 ? '+' : ''}${eur(params.solde)}`, {
+      x: width - 50 - 80, y, size: 10, font: fontRegular, color: soldeColor,
     })
     y -= 18
   }
@@ -125,14 +124,13 @@ async function generateQuittancePdf(params: {
     thickness: 1, color: rgb(0.85, 0.88, 0.92),
   })
   y -= 18
-  page.drawText('TOTAL REÇU', { x: 50, y, size: 11, font: fontBold, color: noir })
-  page.drawText(`${params.total.toLocaleString('fr-FR')} €`, {
-    x: width - 50 - 60, y, size: 11, font: fontBold, color: noir,
-  })
+  page.drawText('TOTAL RECU', { x: 50, y, size: 11, font: fontBold, color: noir })
+  page.drawText(eur(params.total), { x: width - 50 - 80, y, size: 11, font: fontBold, color: noir })
   y -= 40
 
   // Texte légal
-  const legal = `Je soussigné(e), ${params.proprietaireNom}, propriétaire du logement désigné ci-dessus, déclare avoir reçu de ${params.locataireNom} la somme de ${params.total.toLocaleString('fr-FR')} € au titre du loyer et des charges du mois de ${formatMois(params.mois)}, et lui en donne quittance, sous réserve de tous mes droits.`
+  const formatEur = (n: number) => n.toLocaleString('fr-FR').replace(/ /g, ' ').replace(/ /g, ' ')
+  const legal = `Je soussigne(e), ${params.proprietaireNom}, proprietaire du logement designe ci-dessus, declare avoir recu de ${params.locataireNom} la somme de ${formatEur(params.total)} EUR au titre du loyer et des charges du mois de ${formatMois(params.mois)}, et lui en donne quittance, sous reserve de tous mes droits.`
 
   // Wrap text
   const maxWidth = width - 100
@@ -242,14 +240,19 @@ export async function POST(req: NextRequest) {
 
     const dateSignature = formatDateSignature(new Date())
 
+    // Nettoyer tous les caractères non-WinAnsi (espaces insécables, etc.)
+    function clean(s: string): string {
+      return s.replace(/[     ​‌‍﻿]/g, ' ').trim()
+    }
+
     // Générer le PDF
     const pdfBytes = await generateQuittancePdf({
-      locataireNom: quittance.locataires?.nom ?? '—',
-      locataireEmail: quittance.locataires?.email ?? '',
-      proprietaireNom,
-      bienNom: quittance.biens?.nom ?? '',
-      bienAdresse: quittance.biens?.adresse ?? '',
-      bienVille: quittance.biens?.ville ?? '',
+      locataireNom: clean(quittance.locataires?.nom ?? '-'),
+      locataireEmail: clean(quittance.locataires?.email ?? ''),
+      proprietaireNom: clean(proprietaireNom),
+      bienNom: clean(quittance.biens?.nom ?? ''),
+      bienAdresse: clean(quittance.biens?.adresse ?? ''),
+      bienVille: clean(quittance.biens?.ville ?? ''),
       mois: quittance.mois,
       loyerHc: quittance.loyer_hc,
       charges: quittance.charges,
