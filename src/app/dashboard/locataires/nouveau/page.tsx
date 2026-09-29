@@ -5,14 +5,30 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { ajouterLocataire } from './actions'
 
-type Bien = { id: string; nom: string; ville: string }
+type Bien = { id: string; nom: string; ville: string; lots?: Lot[] }
+type Lot = { id: string; numero: string; type_lot: string; surface_m2: number }
+
+type Locataire = {
+  prenom: string
+  nom: string
+  email: string
+  telephone: string
+}
+
+function defaultLocataire(): Locataire {
+  return { prenom: '', nom: '', email: '', telephone: '' }
+}
 
 export default function NouveauLocatairePage() {
   const [biens, setBiens] = useState<Bien[]>([])
+  const [lots, setLots] = useState<Lot[]>([])
+  const [selectedBienId, setSelectedBienId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loyerHc, setLoyerHc] = useState(0)
   const [charges, setCharges] = useState(0)
+  const [nbLocataires, setNbLocataires] = useState(1)
+  const [locataires, setLocataires] = useState<Locataire[]>([defaultLocataire()])
 
   useEffect(() => {
     const supabase = createClient()
@@ -21,11 +37,35 @@ export default function NouveauLocatairePage() {
     })
   }, [])
 
+  useEffect(() => {
+    if (!selectedBienId) { setLots([]); return }
+    const supabase = createClient()
+    supabase
+      .from('lots')
+      .select('id, numero, type_lot, surface_m2')
+      .eq('bien_id', selectedBienId)
+      .then(({ data }) => setLots(data ?? []))
+  }, [selectedBienId])
+
+  function handleNbLocataires(val: string) {
+    const n = Math.max(1, parseInt(val) || 1)
+    setNbLocataires(n)
+    setLocataires(prev => {
+      if (n > prev.length) return [...prev, ...Array(n - prev.length).fill(null).map(defaultLocataire)]
+      return prev.slice(0, n)
+    })
+  }
+
+  function updateLocataire(index: number, field: keyof Locataire, value: string) {
+    setLocataires(prev => prev.map((l, i) => i === index ? { ...l, [field]: value } : l))
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     setError(null)
     const formData = new FormData(e.currentTarget)
+    formData.append('locataires_json', JSON.stringify(locataires))
     const result = await ajouterLocataire(formData)
     if (result?.error) {
       setError(result.error)
@@ -34,6 +74,7 @@ export default function NouveauLocatairePage() {
   }
 
   const inputClass = "w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+  const hasLots = lots.length > 0
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
@@ -51,36 +92,127 @@ export default function NouveauLocatairePage() {
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
         <form onSubmit={handleSubmit} className="space-y-5">
 
+          {/* Bien */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Bien concerné <span className="text-red-500">*</span></label>
-            <select name="bien_id" required defaultValue="" className={inputClass + " bg-white"}>
+            <select name="bien_id" required defaultValue="" className={inputClass + " bg-white"}
+              onChange={e => setSelectedBienId(e.target.value)}>
               <option value="" disabled>Choisir un bien…</option>
               {biens.map(b => <option key={b.id} value={b.id}>{b.nom} — {b.ville}</option>)}
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* Lot (si immeuble de rapport avec lots) */}
+          {hasLots && (
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Nom complet <span className="text-red-500">*</span></label>
-              <input name="nom" type="text" required placeholder="Ex : Marie Dupont" className={inputClass} />
+              <label className="block text-sm font-medium text-slate-700 mb-1">Lot concerné</label>
+              <select name="lot_id" className={inputClass + " bg-white"} defaultValue="">
+                <option value="">Aucun lot spécifique</option>
+                {lots.map(l => (
+                  <option key={l.id} value={l.id}>
+                    Lot {l.numero} — {l.type_lot}{l.surface_m2 ? ` (${l.surface_m2} m²)` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email <span className="text-red-500">*</span></label>
-              <input name="email" type="email" required placeholder="marie@email.com" className={inputClass} />
-            </div>
+          )}
+
+          {/* Nombre de locataires */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Nombre de locataires</label>
+            <select
+              value={nbLocataires}
+              onChange={e => handleNbLocataires(e.target.value)}
+              className={inputClass + " bg-white"}
+            >
+              {[1, 2, 3, 4].map(n => (
+                <option key={n} value={n}>{n} locataire{n > 1 ? 's' : ''}</option>
+              ))}
+            </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Téléphone</label>
-              <input name="telephone" type="text" placeholder="06 00 00 00 00" className={inputClass} />
+          {/* Locataires */}
+          {locataires.map((loc, i) => (
+            <div key={i} className={i > 0 ? "bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3" : "space-y-3"}>
+              {i > 0 && (
+                <h3 className="text-sm font-semibold text-slate-700">
+                  Locataire {i + 1} <span className="font-normal text-slate-400">(facultatif)</span>
+                </h3>
+              )}
+              {i === 0 && nbLocataires > 1 && (
+                <h3 className="text-sm font-semibold text-slate-700">Locataire principal</h3>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Prénom {i === 0 && <span className="text-red-500">*</span>}
+                  </label>
+                  <input
+                    type="text"
+                    required={i === 0}
+                    placeholder="Ex : Marie"
+                    value={loc.prenom}
+                    onChange={e => updateLocataire(i, 'prenom', e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Nom {i === 0 && <span className="text-red-500">*</span>}
+                  </label>
+                  <input
+                    type="text"
+                    required={i === 0}
+                    placeholder="Ex : Dupont"
+                    value={loc.nom}
+                    onChange={e => updateLocataire(i, 'nom', e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Email {i === 0 && <span className="text-red-500">*</span>}
+                  </label>
+                  <input
+                    type="email"
+                    required={i === 0}
+                    placeholder="marie@email.com"
+                    value={loc.email}
+                    onChange={e => updateLocataire(i, 'email', e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Téléphone</label>
+                  <input
+                    type="text"
+                    placeholder="06 00 00 00 00"
+                    value={loc.telephone}
+                    onChange={e => updateLocataire(i, 'telephone', e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
             </div>
+          ))}
+
+          {/* Date d'entrée */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Date d&apos;entrée <span className="text-red-500">*</span></label>
               <input name="date_entree" type="date" required className={inputClass} />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Durée du bail (ans)</label>
+              <input name="duree_bail_ans" type="number" min="1" defaultValue="3" className={inputClass} />
+            </div>
           </div>
 
+          {/* Loyers */}
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Loyer HC (€) <span className="text-red-500">*</span></label>
@@ -104,20 +236,16 @@ export default function NouveauLocatairePage() {
             </div>
           )}
 
+          {/* Paiement & options */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Durée du bail (ans)</label>
-              <input name="duree_bail_ans" type="number" min="1" defaultValue="3" className={inputClass} />
-            </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Mode de paiement</label>
               <input name="mode_paiement" type="text" defaultValue="Avant le 5" className={inputClass} />
             </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input name="caution_payee" id="caution_payee" type="checkbox" className="rounded border-slate-300 text-blue-600" />
-            <label htmlFor="caution_payee" className="text-sm text-slate-700">Caution déjà reçue</label>
+            <div className="flex items-center gap-2 pt-6">
+              <input name="caution_payee" id="caution_payee" type="checkbox" className="rounded border-slate-300 text-blue-600" />
+              <label htmlFor="caution_payee" className="text-sm text-slate-700">Caution déjà reçue</label>
+            </div>
           </div>
 
           <div>
