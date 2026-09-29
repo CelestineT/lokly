@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 const navItems = [
   {
@@ -103,31 +104,53 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
 
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
   const NavContent = () => (
-    <nav className="flex flex-col gap-1 p-4">
+    <nav className="flex flex-col gap-1 p-4 h-full">
       <div className="text-white font-bold text-xl px-3 py-4 mb-2">Lokly</div>
-      {navItems.map((item) => {
-        const isActive = item.href === '/dashboard'
-          ? pathname === '/dashboard'
-          : pathname.startsWith(item.href)
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={() => setOpen(false)}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              isActive
-                ? 'bg-blue-700 text-white'
-                : 'text-blue-100 hover:bg-blue-700/50 hover:text-white'
-            }`}
-          >
-            {item.icon}
-            {item.label}
-          </Link>
-        )
-      })}
+      <div className="flex-1 flex flex-col gap-1">
+        {navItems.map((item) => {
+          const isActive = item.href === '/dashboard'
+            ? pathname === '/dashboard'
+            : pathname.startsWith(item.href)
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setOpen(false)}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-blue-700 text-white'
+                  : 'text-blue-100 hover:bg-blue-700/50 hover:text-white'
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </Link>
+          )
+        })}
+      </div>
+      <div className="pt-4 border-t border-blue-700 mt-2">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-blue-200 hover:bg-blue-700/50 hover:text-white transition-colors w-full text-left"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Se déconnecter
+        </button>
+      </div>
     </nav>
   )
 

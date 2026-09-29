@@ -6,14 +6,14 @@ import { ajouterBien } from './actions'
 
 const ANNEXES_IMMEUBLE = [
   { value: 'cour', label: 'Cour' },
-  { value: 'garage_commun', label: 'Garage commun' },
-  { value: 'cave_commune', label: 'Cave commune' },
-  { value: 'parking_commun', label: 'Parking commun' },
+  { value: 'parking', label: 'Parking' },
+  { value: 'box', label: 'Box' },
 ]
 
 const ANNEXES_LOT = [
-  { value: 'cave_privative', label: 'Cave privative' },
-  { value: 'parking_privatif', label: 'Parking privatif' },
+  { value: 'cave', label: 'Cave' },
+  { value: 'parking', label: 'Parking' },
+  { value: 'box', label: 'Box' },
   { value: 'balcon', label: 'Balcon' },
   { value: 'terrasse', label: 'Terrasse' },
   { value: 'grenier', label: 'Grenier' },
@@ -22,7 +22,7 @@ const ANNEXES_LOT = [
 const ANNEXES_BIEN = [
   { value: 'cave', label: 'Cave' },
   { value: 'parking', label: 'Parking' },
-  { value: 'garage', label: 'Garage' },
+  { value: 'box', label: 'Box' },
   { value: 'cour', label: 'Cour' },
   { value: 'jardin', label: 'Jardin' },
   { value: 'grenier', label: 'Grenier' },
@@ -30,7 +30,22 @@ const ANNEXES_BIEN = [
   { value: 'balcon', label: 'Balcon' },
 ]
 
+const TYPES_LOT = [
+  { value: 'appartement', label: 'Appartement' },
+  { value: 'studio', label: 'Studio' },
+  { value: 'cave', label: 'Cave' },
+  { value: 'garage', label: 'Garage' },
+  { value: 'box', label: 'Box' },
+  { value: 'parking', label: 'Parking' },
+  { value: 'local_commercial', label: 'Local commercial' },
+  { value: 'autre', label: 'Autre' },
+]
+
+// Types de lots avec pièces habitables (surface + nb pièces)
+const TYPES_LOT_HABITABLE = ['appartement', 'studio', 'local_commercial', 'autre']
+
 type Lot = {
+  type_lot: string
   surface_m2: string
   nb_pieces: string
   type_location: string
@@ -38,7 +53,7 @@ type Lot = {
 }
 
 function defaultLot(): Lot {
-  return { surface_m2: '', nb_pieces: '', type_location: '', annexes: [] }
+  return { type_lot: '', surface_m2: '', nb_pieces: '', type_location: '', annexes: [] }
 }
 
 function AnnexesPicker({ options, selected, onChange }: {
@@ -209,60 +224,86 @@ export default function NouveauBienPage() {
           )}
 
           {/* Annexes */}
-          <div>
-            <p className="block text-sm font-medium text-slate-700 mb-2">
-              {isImmeubleRapport ? 'Annexes communes de l\'immeuble' : 'Annexes'}
-            </p>
-            <AnnexesPicker
-              options={isImmeubleRapport ? ANNEXES_IMMEUBLE : ANNEXES_BIEN}
-              selected={annexes}
-              onChange={setAnnexes}
-            />
-          </div>
+          {typeBien && (
+            <div>
+              <p className="block text-sm font-medium text-slate-700 mb-2">
+                {isImmeubleRapport ? 'Annexes de l\'immeuble' : 'Annexes'}
+              </p>
+              <AnnexesPicker
+                options={isImmeubleRapport ? ANNEXES_IMMEUBLE : ANNEXES_BIEN}
+                selected={annexes}
+                onChange={setAnnexes}
+              />
+            </div>
+          )}
 
           {/* Formulaires des lots */}
           {isImmeubleRapport && lots.length > 0 && (
             <div className="space-y-4 pt-2">
               <h2 className="text-base font-semibold text-slate-800 border-t pt-4">Détail des lots</h2>
-              {lots.map((lot, i) => (
-                <div key={i} className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-700">Lot {i + 1}</h3>
-                  <div className="grid grid-cols-3 gap-3">
+              {lots.map((lot, i) => {
+                const isHabitable = TYPES_LOT_HABITABLE.includes(lot.type_lot)
+                return (
+                  <div key={i} className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
+                    <h3 className="text-sm font-semibold text-slate-700">Lot {i + 1}</h3>
+
+                    {/* Type de lot */}
                     <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Surface (m²) <span className="text-red-500">*</span></label>
-                      <input type="number" min="1" step="0.01" required placeholder="Ex : 35"
-                        value={lot.surface_m2}
-                        onChange={e => updateLot(i, 'surface_m2', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Nb pièces <span className="text-red-500">*</span></label>
-                      <input type="number" min="1" step="1" required placeholder="Ex : 2"
-                        value={lot.nb_pieces}
-                        onChange={e => updateLot(i, 'nb_pieces', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Location <span className="text-red-500">*</span></label>
-                      <select required value={lot.type_location}
-                        onChange={e => updateLot(i, 'type_location', e.target.value)}
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Type de lot <span className="text-red-500">*</span></label>
+                      <select required value={lot.type_lot}
+                        onChange={e => updateLot(i, 'type_lot', e.target.value)}
                         className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                         <option value="">Choisir…</option>
-                        <option value="meuble">Meublé</option>
-                        <option value="non_meuble">Non meublé</option>
+                        {TYPES_LOT.map(t => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
                       </select>
                     </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Surface (m²) <span className="text-red-500">*</span></label>
+                        <input type="number" min="1" step="0.01" required placeholder="Ex : 35"
+                          value={lot.surface_m2}
+                          onChange={e => updateLot(i, 'surface_m2', e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                      {isHabitable && (
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Nb pièces</label>
+                          <input type="number" min="1" step="1" placeholder="Ex : 2"
+                            value={lot.nb_pieces}
+                            onChange={e => updateLot(i, 'nb_pieces', e.target.value)}
+                            className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                      )}
+                      {isHabitable && (
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Location <span className="text-red-500">*</span></label>
+                          <select required={isHabitable} value={lot.type_location}
+                            onChange={e => updateLot(i, 'type_location', e.target.value)}
+                            className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                            <option value="">Choisir…</option>
+                            <option value="meuble">Meublé</option>
+                            <option value="non_meuble">Non meublé</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    {isHabitable && (
+                      <div>
+                        <p className="text-xs font-medium text-slate-600 mb-1.5">Annexes du lot</p>
+                        <AnnexesPicker
+                          options={ANNEXES_LOT}
+                          selected={lot.annexes}
+                          onChange={v => updateLot(i, 'annexes', v)}
+                        />
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-600 mb-1.5">Annexes du lot</p>
-                    <AnnexesPicker
-                      options={ANNEXES_LOT}
-                      selected={lot.annexes}
-                      onChange={v => updateLot(i, 'annexes', v)}
-                    />
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
