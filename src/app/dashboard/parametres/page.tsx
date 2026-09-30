@@ -5,15 +5,18 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function ParametresPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [drawing, setDrawing] = useState(false)
   const [hasSignature, setHasSignature] = useState(false)
   const [savedSignature, setSavedSignature] = useState<string | null>(null)
+  const [previewSignature, setPreviewSignature] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [nom, setNom] = useState('')
   const [prenom, setPrenom] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
   const [savedProfile, setSavedProfile] = useState(false)
+  const [mode, setMode] = useState<'draw' | 'upload'>('upload')
 
   useEffect(() => {
     const supabase = createClient()
@@ -26,7 +29,6 @@ export default function ParametresPage() {
             setPrenom(data.prenom ?? '')
             if (data.signature_base64) {
               setSavedSignature(data.signature_base64)
-              setHasSignature(true)
             }
           }
         })
@@ -35,6 +37,7 @@ export default function ParametresPage() {
 
   // Canvas setup
   useEffect(() => {
+    if (mode !== 'draw') return
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
@@ -45,7 +48,7 @@ export default function ParametresPage() {
     ctx.lineWidth = 2
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-  }, [])
+  }, [mode])
 
   function getPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
     const rect = canvas.getBoundingClientRect()
@@ -74,6 +77,7 @@ export default function ParametresPage() {
     setDrawing(true)
     setHasSignature(true)
     setSaved(false)
+    setPreviewSignature(null)
   }
 
   function draw(e: React.MouseEvent | React.TouchEvent) {
@@ -103,11 +107,33 @@ export default function ParametresPage() {
     setSaved(false)
   }
 
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result as string
+      setPreviewSignature(base64)
+      setHasSignature(true)
+      setSaved(false)
+    }
+    reader.readAsDataURL(file)
+  }
+
   async function saveSignature() {
-    const canvas = canvasRef.current
-    if (!canvas) return
     setSaving(true)
-    const base64 = canvas.toDataURL('image/png')
+    let base64: string | null = null
+
+    if (mode === 'upload') {
+      base64 = previewSignature
+    } else {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      base64 = canvas.toDataURL('image/png')
+    }
+
+    if (!base64) return
+
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -141,7 +167,6 @@ export default function ParametresPage() {
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
         <h2 className="text-base font-semibold text-slate-800">Informations bailleur</h2>
         <p className="text-sm text-slate-500">Ces informations apparaissent sur vos quittances.</p>
-
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Prénom</label>
@@ -152,7 +177,6 @@ export default function ParametresPage() {
             <input type="text" value={nom} onChange={e => setNom(e.target.value)} placeholder="Tsondo" className={inputClass} />
           </div>
         </div>
-
         <div className="flex items-center gap-3">
           <button onClick={saveProfile} disabled={savingProfile}
             className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60">
@@ -166,12 +190,13 @@ export default function ParametresPage() {
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
         <h2 className="text-base font-semibold text-slate-800">Signature électronique</h2>
         <p className="text-sm text-slate-500">
-          Dessinez votre signature ci-dessous. Elle sera automatiquement apposée sur vos quittances PDF.
+          Votre signature sera automatiquement apposée sur vos quittances PDF.
         </p>
 
+        {/* Signature actuelle */}
         {savedSignature && (
           <div className="space-y-2">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Signature actuelle</p>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Signature enregistrée</p>
             <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 inline-block">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={savedSignature} alt="Signature enregistrée" className="h-16 object-contain" />
@@ -179,36 +204,83 @@ export default function ParametresPage() {
           </div>
         )}
 
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-            {savedSignature ? 'Nouvelle signature' : 'Dessinez votre signature'}
-          </p>
-          <div className="border-2 border-dashed border-slate-200 rounded-xl overflow-hidden touch-none">
-            <canvas
-              ref={canvasRef}
-              width={600}
-              height={180}
-              className="w-full cursor-crosshair"
-              onMouseDown={startDrawing}
-              onMouseMove={draw}
-              onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
-              onTouchStart={startDrawing}
-              onTouchMove={draw}
-              onTouchEnd={stopDrawing}
-            />
-          </div>
-          <p className="text-xs text-slate-400">Dessinez avec la souris ou le doigt</p>
+        {/* Onglets draw / upload */}
+        <div className="flex gap-2 border-b border-slate-100 pb-0">
+          <button
+            type="button"
+            onClick={() => { setMode('upload'); setHasSignature(false); setSaved(false) }}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mode === 'upload' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+            Importer une image
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode('draw'); setHasSignature(false); setSaved(false); setPreviewSignature(null) }}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mode === 'draw' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+            Dessiner
+          </button>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Mode upload */}
+        {mode === 'upload' && (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500">Importez votre signature en PNG, JPG ou SVG.</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-2 border border-slate-200 text-slate-700 rounded-xl px-4 py-2 text-sm font-medium hover:bg-slate-50 transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Choisir un fichier
+            </button>
+            {previewSignature && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-slate-500">Aperçu</p>
+                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 inline-block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={previewSignature} alt="Aperçu signature" className="h-16 object-contain" />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Mode dessin */}
+        {mode === 'draw' && (
+          <div className="space-y-2">
+            <p className="text-sm text-slate-500">Dessinez avec la souris ou le doigt.</p>
+            <div className="border-2 border-dashed border-slate-200 rounded-xl overflow-hidden touch-none">
+              <canvas
+                ref={canvasRef}
+                width={600}
+                height={180}
+                className="w-full cursor-crosshair"
+                onMouseDown={startDrawing}
+                onMouseMove={draw}
+                onMouseUp={stopDrawing}
+                onMouseLeave={stopDrawing}
+                onTouchStart={startDrawing}
+                onTouchMove={draw}
+                onTouchEnd={stopDrawing}
+              />
+            </div>
+            <button onClick={clearCanvas} type="button" className="text-xs text-slate-400 hover:text-slate-600">
+              Effacer
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 pt-2">
           <button onClick={saveSignature} disabled={!hasSignature || saving}
             className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60">
             {saving ? 'Enregistrement…' : 'Sauvegarder la signature'}
-          </button>
-          <button onClick={clearCanvas} type="button"
-            className="text-sm text-slate-500 hover:text-slate-800 px-3 py-2">
-            Effacer
           </button>
           {saved && <span className="text-sm text-green-600 font-medium">✓ Signature sauvegardée</span>}
         </div>

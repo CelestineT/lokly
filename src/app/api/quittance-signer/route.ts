@@ -77,7 +77,7 @@ async function generateQuittancePdf(params: {
   y -= 30
 
   // Bien loué
-  page.drawText('BIEN LOUÉ', { x: 50, y, size: 8, font: fontBold, color: bleu })
+  page.drawText('BIEN LOUE', { x: 50, y, size: 8, font: fontBold, color: bleu })
   y -= 18
   page.drawText(params.bienNom, { x: 50, y, size: 11, font: fontBold, color: noir })
   y -= 18
@@ -168,20 +168,16 @@ async function generateQuittancePdf(params: {
   page.drawText('Signature du bailleur :', { x: 50, y, size: 10, font: fontBold, color: noir })
   y -= 10
 
-  // Embed signature image
+  // Embed signature image (depuis profiles.signature_base64)
   if (params.signatureDataUrl && params.signatureDataUrl.includes('base64,')) {
     try {
       const base64 = params.signatureDataUrl.split('base64,')[1]
       if (base64 && base64.length > 100) {
-        // Le canvas HTML a un fond transparent → on convertit via une image JPEG avec fond blanc
-        // en recréant les bytes PNG tels quels (pdf-lib supporte PNG avec transparence)
         const sigBytes = Buffer.from(base64, 'base64')
-        // On tente d'abord PNG, si échec on dessine le rectangle
         let embedded = false
         try {
           const sigImage = await pdfDoc.embedPng(sigBytes)
           const sigDims = sigImage.scaleToFit(220, 90)
-          // Fond blanc derrière la signature
           page.drawRectangle({
             x: 50, y: y - sigDims.height,
             width: sigDims.width, height: sigDims.height,
@@ -194,8 +190,27 @@ async function generateQuittancePdf(params: {
             height: sigDims.height,
           })
           embedded = true
-        } catch (pngErr) {
-          console.error('embedPng failed:', pngErr)
+        } catch {
+          // Si PNG échoue, on tente JPEG
+          try {
+            const sigBytes2 = Buffer.from(base64, 'base64')
+            const sigImage = await pdfDoc.embedJpg(sigBytes2)
+            const sigDims = sigImage.scaleToFit(220, 90)
+            page.drawRectangle({
+              x: 50, y: y - sigDims.height,
+              width: sigDims.width, height: sigDims.height,
+              color: rgb(1, 1, 1),
+            })
+            page.drawImage(sigImage, {
+              x: 50,
+              y: y - sigDims.height,
+              width: sigDims.width,
+              height: sigDims.height,
+            })
+            embedded = true
+          } catch {
+            console.error('embedJpg also failed')
+          }
         }
         if (!embedded) {
           page.drawRectangle({ x: 50, y: y - 80, width: 220, height: 80, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 1 })
@@ -205,9 +220,13 @@ async function generateQuittancePdf(params: {
         page.drawRectangle({ x: 50, y: y - 80, width: 220, height: 80, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 1 })
       }
     } catch (e) {
-      console.error('Erreur embed signature PNG:', e)
+      console.error('Erreur embed signature:', e)
       page.drawRectangle({ x: 50, y: y - 80, width: 220, height: 80, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 1 })
     }
+  } else {
+    // Pas de signature enregistrée : rectangle vide
+    page.drawRectangle({ x: 50, y: y - 80, width: 220, height: 80, borderColor: rgb(0.85, 0.88, 0.92), borderWidth: 1 })
+    page.drawText('Aucune signature enregistree', { x: 60, y: y - 44, size: 9, font: fontRegular, color: gris })
   }
 
   return pdfDoc.save()
@@ -215,8 +234,8 @@ async function generateQuittancePdf(params: {
 
 export async function POST(req: NextRequest) {
   try {
-    const { quittanceId, otp, signatureDataUrl } = await req.json()
-    if (!quittanceId || !otp || !signatureDataUrl) {
+    const { quittanceId, otp } = await req.json()
+    if (!quittanceId || !otp) {
       return NextResponse.json({ error: 'Données manquantes' }, { status: 400 })
     }
 
@@ -258,10 +277,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Quittance introuvable' }, { status: 404 })
     }
 
-    // Récupérer le nom du propriétaire
+    // Récupérer le profil du propriétaire (nom + signature)
     const { data: profile } = await supabase
       .from('profiles')
-      .select('nom, prenom')
+      .select('nom, prenom, signature_base64')
       .eq('id', user.id)
       .single()
 
@@ -269,11 +288,14 @@ export async function POST(req: NextRequest) {
       ? `${profile.prenom ?? ''} ${profile.nom ?? ''}`.trim() || user.email!
       : user.email!
 
+    // Signature depuis la base (priorité) — plus besoin de l'envoyer depuis le front
+    const signatureDataUrl = profile?.signature_base64 ?? ''
+
     const dateSignature = formatDateSignature(new Date())
 
-    // Nettoyer tous les caractères non-WinAnsi (espaces insécables, etc.)
+    // Nettoyer les caractères non-WinAnsi
     function clean(s: string): string {
-      return s.replace(/[     ​‌‍﻿]/g, ' ').trim()
+      return s.replace(/[     ​‌‍﻿]/g, ' ').trim()
     }
 
     // Générer le PDF
@@ -302,7 +324,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email locataire introuvable' }, { status: 400 })
     }
 
-    // Mode test : envoi forcé vers synteyapartners@gmail.com (seule adresse autorisée par Resend sans domaine vérifié)
+    // Mode test : envoi forcé vers synteyapartners@gmail.com
     const emailDest = 'synteyapartners@gmail.com'
     console.log(`[MODE TEST] Envoi PDF vers ${emailDest} (locataire réel : ${locataireEmail})`)
 
@@ -337,10 +359,9 @@ export async function POST(req: NextRequest) {
     if (!resendRes.ok) {
       const resendError = await resendRes.json()
       console.error('Resend error:', resendError)
-      // Non bloquant en mode test
     }
 
-    // Mettre à jour la quittance comme envoyée + date_signature
+    // Mettre à jour la quittance comme envoyée
     await supabase
       .from('quittances')
       .update({

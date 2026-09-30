@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -27,7 +27,7 @@ function formatMois(mois: string): string {
     .replace(/^./, (c) => c.toUpperCase())
 }
 
-type Step = 'view' | 'sign' | 'otp' | 'done'
+type Step = 'view' | 'otp' | 'done'
 
 export default function QuittanceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [quittance, setQuittance] = useState<Quittance | null>(null)
@@ -44,11 +44,6 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
   const [deleting, setDeleting] = useState(false)
   const [avoirConfirm, setAvoirConfirm] = useState(false)
   const [avoirDone, setAvoirDone] = useState(false)
-  const [isDrawing, setIsDrawing] = useState(false)
-  const [hasSignature, setHasSignature] = useState(false)
-  const [savedSignatureUrl, setSavedSignatureUrl] = useState<string>('')
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const lastPos = useRef<{ x: number; y: number } | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -68,80 +63,8 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
     })
   }, [params])
 
-  // Canvas signature helpers — corrige le ratio entre taille CSS et taille interne du canvas
-  function getPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
-    const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
-    if ('touches' in e) {
-      return {
-        x: (e.touches[0].clientX - rect.left) * scaleX,
-        y: (e.touches[0].clientY - rect.top) * scaleY,
-      }
-    }
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
-    }
-  }
-
-  function startDraw(e: React.MouseEvent | React.TouchEvent) {
-    e.preventDefault()
-    const canvas = canvasRef.current
-    if (!canvas) return
-    setIsDrawing(true)
-    lastPos.current = getPos(e, canvas)
-  }
-
-  function draw(e: React.MouseEvent | React.TouchEvent) {
-    e.preventDefault()
-    if (!isDrawing) return
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    if (!canvas || !ctx || !lastPos.current) return
-    const pos = getPos(e, canvas)
-    ctx.beginPath()
-    ctx.moveTo(lastPos.current.x, lastPos.current.y)
-    ctx.lineTo(pos.x, pos.y)
-    ctx.strokeStyle = '#1e293b'
-    ctx.lineWidth = 2.5
-    ctx.lineCap = 'round'
-    ctx.stroke()
-    lastPos.current = pos
-    setHasSignature(true)
-  }
-
-  function stopDraw() {
-    setIsDrawing(false)
-    lastPos.current = null
-  }
-
-  function clearCanvas() {
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    if (!canvas || !ctx) return
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    setHasSignature(false)
-  }
-
-  function getSignatureDataUrl(): string {
-    const canvas = canvasRef.current
-    if (!canvas) return ''
-    // Créer un canvas temporaire avec fond blanc pour que la signature soit visible dans le PDF
-    const tmp = document.createElement('canvas')
-    tmp.width = canvas.width
-    tmp.height = canvas.height
-    const ctx = tmp.getContext('2d')!
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, tmp.width, tmp.height)
-    ctx.drawImage(canvas, 0, 0)
-    return tmp.toDataURL('image/png')
-  }
-
-  async function handleValiderSignature() {
-    if (!hasSignature || !resolvedId) return
-    const signatureDataUrl = getSignatureDataUrl()
-    setSavedSignatureUrl(signatureDataUrl)
+  async function handleSignerEtEnvoyer() {
+    if (!resolvedId) return
     setSending(true)
     setMessage(null)
     try {
@@ -208,7 +131,7 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
       const res = await fetch('/api/quittance-signer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quittanceId: resolvedId, otp, signatureDataUrl: savedSignatureUrl }),
+        body: JSON.stringify({ quittanceId: resolvedId, otp }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -320,55 +243,21 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
           </div>
         </div>
 
-        {/* Actions selon l'étape */}
+        {/* Bouton principal : Signer et envoyer */}
         {!quittance.envoyee && step === 'view' && (
           <div className="pt-2">
             <button
-              onClick={() => setStep('sign')}
-              className="w-full inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-3 text-sm font-medium hover:bg-blue-700 transition-colors"
+              onClick={handleSignerEtEnvoyer}
+              disabled={sending}
+              className="w-full inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-3 text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
             >
-              ✍🏿 Signer et envoyer au locataire
+              {sending ? 'Envoi du code…' : '✍🏿 Signer et envoyer au locataire'}
             </button>
+            {message && <p className="text-xs text-center text-red-500 mt-2">{message.text}</p>}
           </div>
         )}
 
-        {/* Étape 1 : Canvas de signature */}
-        {step === 'sign' && (
-          <div className="pt-2 space-y-3">
-            <p className="text-sm font-medium text-slate-700">Tracez votre signature :</p>
-            <div className="border-2 border-slate-200 rounded-xl overflow-hidden bg-slate-50">
-              <canvas
-                ref={canvasRef}
-                width={560}
-                height={220}
-                className="w-full touch-none cursor-crosshair"
-                onMouseDown={startDraw}
-                onMouseMove={draw}
-                onMouseUp={stopDraw}
-                onMouseLeave={stopDraw}
-                onTouchStart={startDraw}
-                onTouchMove={draw}
-                onTouchEnd={stopDraw}
-              />
-            </div>
-            <div className="flex gap-2">
-              <button onClick={clearCanvas}
-                className="flex-1 border border-slate-200 text-slate-600 rounded-xl px-4 py-2 text-sm font-medium hover:bg-slate-50 transition-colors">
-                Effacer
-              </button>
-              <button
-                onClick={handleValiderSignature}
-                disabled={!hasSignature || sending}
-                className="flex-1 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
-                {sending ? 'Envoi du code…' : 'Valider la signature'}
-              </button>
-            </div>
-            {message && <p className="text-xs text-center text-red-500">{message.text}</p>}
-          </div>
-        )}
-
-        {/* Étape 2 : Saisie OTP */}
+        {/* Étape OTP */}
         {step === 'otp' && (
           <div className="pt-2 space-y-3">
             <p className="text-sm font-medium text-slate-700">Saisissez le code de confirmation :</p>
@@ -397,7 +286,7 @@ export default function QuittanceDetailPage({ params }: { params: Promise<{ id: 
           </div>
         )}
 
-        {/* Étape 3 : Succès */}
+        {/* Succès */}
         {step === 'done' && (
           <div className="pt-2 text-center space-y-2">
             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto">
