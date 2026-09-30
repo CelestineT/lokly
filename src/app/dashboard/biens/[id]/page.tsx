@@ -1,26 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-
-const labels: Record<string,string> = { appartement:'Appartement', maison:'Maison', studio:'Studio', immeuble:'Immeuble', immeuble_rapport:'Immeuble de rapport', parking:'Parking', box:'Box', garage:'Garage', cave:'Cave', local_commercial:'Local commercial', autre:'Autre' }
-
-export default async function BienDetailPage({ params }: { params: Promise<{ id:string }> }) {
-  const { id } = await params
-  const supabase = await createClient()
-  const { data: bien } = await supabase.from('biens').select('*').eq('id', id).single()
-  if (!bien) notFound()
-
-  return <div className="p-6 max-w-3xl mx-auto">
-    <Link href="/dashboard/biens" className="text-sm text-slate-500">← Retour à mes biens</Link>
-    <div className="flex items-start justify-between mt-5 mb-6"><div><h1 className="text-2xl font-bold text-slate-900">{bien.nom}</h1><p className="text-slate-500 mt-1">{bien.adresse}, {bien.code_postal} {bien.ville}</p></div><Link href={`/dashboard/biens/${bien.id}/modifier`} className="bg-blue-600 text-white rounded-xl px-4 py-2 text-sm">Modifier</Link></div>
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 grid sm:grid-cols-2 gap-5 text-sm">
-      <div><p className="text-slate-400">Type</p><p className="font-medium">{labels[bien.type] ?? bien.type}</p></div>
-      {bien.specificite && <div><p className="text-slate-400">Spécificité</p><p className="font-medium">{bien.specificite}</p></div>}
-      {bien.type_location && <div><p className="text-slate-400">Location</p><p className="font-medium">{bien.type_location === 'meuble' ? 'Meublé' : bien.type_location === 'non_meuble' ? 'Non meublé' : 'Mixte'}</p></div>}
-      {(bien.surface_totale_m2 ?? bien.surface_m2) && <div><p className="text-slate-400">Surface</p><p className="font-medium">{bien.surface_totale_m2 ?? bien.surface_m2} m²</p></div>}
-      {bien.nb_pieces && <div><p className="text-slate-400">Nombre de pièces</p><p className="font-medium">{bien.nb_pieces}</p></div>}
-      {bien.nb_lots && <div><p className="text-slate-400">Nombre de lots</p><p className="font-medium">{bien.nb_lots}</p></div>}
-      {bien.prix_achat && <div><p className="text-slate-400">Prix d'achat</p><p className="font-medium">{Number(bien.prix_achat).toLocaleString('fr-FR')} €</p></div>}
-    </div>
-  </div>
-}
+import DeleteBienButton from '../DeleteBienButton'
+const labels:Record<string,string>={appartement:'Appartement',maison:'Maison',studio:'Studio',immeuble:'Immeuble',immeuble_rapport:'Immeuble de rapport',parking:'Parking',box:'Box',garage:'Garage',cave:'Cave',local_commercial:'Local commercial',autre:'Autre'}
+const loc:Record<string,string>={meuble:'Meublé',non_meuble:'Non meublé',mixte:'Mixte'}
+const ann:Record<string,string>={cave:'Cave',parking:'Parking',box:'Box',garage:'Garage',cour:'Cour',jardin:'Jardin',grenier:'Grenier',terrasse:'Terrasse',balcon:'Balcon'}
+export default async function BienDetailPage({params}:{params:Promise<{id:string}>}){const{id}=await params;const supabase=await createClient();const[{data:bien},{data:lots}]=await Promise.all([supabase.from('biens').select('*').eq('id',id).single(),supabase.from('lots').select('*').eq('bien_id',id).order('numero_lot')]);if(!bien)notFound();return <div className="p-6 max-w-4xl mx-auto"><Link href="/dashboard/biens" className="text-sm text-slate-500">← Retour à mes biens</Link><div className="flex items-start justify-between gap-4 mt-5 mb-6"><div><h1 className="text-2xl font-bold">{bien.nom}</h1><p className="text-slate-500 mt-1">{bien.adresse}, {bien.code_postal} {bien.ville}</p></div><div className="flex gap-2"><Link href={`/dashboard/biens/${bien.id}/modifier`} className="bg-blue-600 text-white rounded-xl px-4 py-2 text-sm">Modifier</Link><DeleteBienButton id={bien.id} nom={bien.nom}/></div></div><div className="bg-white rounded-2xl border shadow-sm p-6 grid sm:grid-cols-2 gap-5 text-sm"><Info l="Type" v={labels[bien.type]??bien.type}/>{bien.specificite&&<Info l="Spécificité" v={bien.specificite}/>} {bien.type_location&&<Info l="Type de location" v={loc[bien.type_location]??bien.type_location}/>} {(bien.surface_totale_m2??bien.surface_m2)!=null&&<Info l="Surface" v={`${bien.surface_totale_m2??bien.surface_m2} m²`}/>} {bien.nb_pieces!=null&&<Info l="Nombre de pièces" v={String(bien.nb_pieces)}/>} {bien.nb_lots!=null&&<Info l="Nombre de lots" v={String(bien.nb_lots)}/>} {bien.prix_achat!=null&&<Info l="Prix d'achat" v={`${Number(bien.prix_achat).toLocaleString('fr-FR')} €`}/>} {bien.annexes?.length>0&&<Info l="Annexes" v={bien.annexes.map((a:string)=>ann[a]??a).join(', ')}/>}</div>{lots&&lots.length>0&&<div className="mt-6"><h2 className="text-lg font-semibold mb-3">Détail des lots</h2><div className="space-y-3">{lots.map((lot:any)=><div key={lot.id} className="bg-white rounded-xl border p-4"><div className="flex justify-between"><p className="font-semibold">{lot.numero_lot}</p><span className="text-sm text-slate-500">{labels[lot.type]??lot.type}</span></div><div className="grid sm:grid-cols-3 gap-3 mt-3 text-sm">{lot.surface_m2!=null&&<Info l="Surface" v={`${lot.surface_m2} m²`}/>} {lot.nb_pieces!=null&&<Info l="Pièces" v={String(lot.nb_pieces)}/>} {lot.type_location&&<Info l="Location" v={loc[lot.type_location]??lot.type_location}/>}</div>{lot.annexes?.length>0&&<p className="text-xs text-slate-500 mt-3">Annexes : {lot.annexes.map((a:string)=>ann[a]??a).join(', ')}</p>}</div>)}</div></div>}</div>}
+function Info({l,v}:{l:string;v:string}){return <div><p className="text-slate-400">{l}</p><p className="font-medium text-slate-800">{v}</p></div>}
