@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 
 export async function creerQuittance(formData: FormData) {
   const supabase = await createClient()
@@ -46,5 +45,5 @@ export async function creerQuittance(formData: FormData) {
   }
 
   revalidatePath('/dashboard/quittances')
-  redirect('/dashboard/quittances')
+  return { ok: true }
 }

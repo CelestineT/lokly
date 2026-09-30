@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { creerQuittance } from './actions'
 
@@ -32,6 +33,7 @@ function currentMonthStr() {
 }
 
 export default function NouvelleQuittancePage() {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [locataires, setLocataires] = useState<Locataire[]>([])
@@ -73,6 +75,8 @@ export default function NouvelleQuittancePage() {
     if (result?.error) {
       setError(result.error)
       setLoading(false)
+    } else if (result?.ok) {
+      router.push('/dashboard/quittances')
     }
   }
 
