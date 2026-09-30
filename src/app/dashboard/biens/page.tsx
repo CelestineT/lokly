@@ -9,7 +9,7 @@ type Bien = {
   ville: string
   code_postal: string
   type: 'appartement' | 'maison' | 'studio' | 'immeuble' | 'immeuble_rapport' | 'autre'
-  type_location: 'meuble' | 'non_meuble'
+  type_location: 'meuble' | 'non_meuble' | null
   surface_m2: number | null
   surface_totale_m2: number | null
   nb_pieces: number | null
@@ -28,7 +28,7 @@ const typeBadge: Record<Bien['type'], { label: string; className: string }> = {
   autre: { label: 'Autre', className: 'bg-slate-100 text-slate-600' },
 }
 
-const locationBadge: Record<Bien['type_location'], { label: string; className: string }> = {
+const locationBadge: Record<string, { label: string; className: string }> = {
   meuble: { label: 'Meublé', className: 'bg-amber-100 text-amber-700' },
   non_meuble: { label: 'Non meublé', className: 'bg-slate-100 text-slate-600' },
 }
@@ -94,7 +94,7 @@ export default async function BiensPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           {liste.map((bien) => {
             const tb = typeBadge[bien.type] ?? { label: bien.type, className: 'bg-slate-100 text-slate-600' }
-            const lb = locationBadge[bien.type_location]
+            const lb = bien.type_location ? locationBadge[bien.type_location] : null
             const isImmeuble = bien.type === 'immeuble' || bien.type === 'immeuble_rapport'
             return (
               <div key={bien.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
@@ -102,7 +102,9 @@ export default async function BiensPage() {
                   <h3 className="font-semibold text-slate-900 text-base leading-snug">{bien.nom}</h3>
                   <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${tb.className}`}>{tb.label}</span>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${lb.className}`}>{lb.label}</span>
+                    {lb && (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${lb.className}`}>{lb.label}</span>
+                    )}
                   </div>
                 </div>
                 <p className="text-sm text-slate-500 flex items-center gap-1.5 mb-3">
