@@ -50,7 +50,6 @@ export async function ajouterLocataire(formData: FormData) {
     const payload: Record<string, unknown> = {
       proprietaire_id: user.id,
       bien_id,
-      lot_id,
       bail_id: bail.id,
       est_principal: i === 0,
       nom: `${loc.prenom.trim()} ${loc.nom.trim()}`.trim(),
