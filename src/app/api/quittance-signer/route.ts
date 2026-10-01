@@ -40,12 +40,16 @@ export async function POST(req:NextRequest){
   if(!locataireEmail)return NextResponse.json({error:'Email locataire introuvable'},{status:400})
   const pdfBase64=Buffer.from(pdfBytes).toString('base64')
   const fileName=`quittance-${quittance.mois}-${String(quittance.locataires?.nom??'locataire').toLowerCase().replace(/\s+/g,'-')}.pdf`
-  const emailDest=process.env.QUITTANCE_TEST_EMAIL||locataireEmail
-  const isTest=Boolean(process.env.QUITTANCE_TEST_EMAIL)
-  const resendRes=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${process.env.RESEND_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({from:'Lokly <onboarding@resend.dev>',to:[emailDest],subject:`${isTest?'[TEST] ':''}Quittance de loyer — ${formatMois(quittance.mois)}`,html:`<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px"><h2>Quittance de loyer</h2><p>Bonjour ${quittance.locataires?.nom??''},<br/>Veuillez trouver ci-joint votre quittance pour <strong>${formatMois(quittance.mois)}</strong>.</p><div style="background:#f1f5f9;border-radius:12px;padding:16px"><strong>Montant total : ${quittance.total} EUR</strong><p>${quittance.biens?.nom??''}${lotLibelle?` — ${lotLibelle}`:''} — ${quittance.biens?.ville??''}</p></div></div>`,attachments:[{filename:fileName,content:pdfBase64}]})})
+
+  const testEmailsRaw=process.env.QUITTANCE_TEST_EMAILS||process.env.QUITTANCE_TEST_EMAIL||''
+  const testEmails=testEmailsRaw.split(',').map(email=>email.trim()).filter(Boolean)
+  const emailDestinations=testEmails.length>0?testEmails:[locataireEmail]
+  const isTest=testEmails.length>0
+
+  const resendRes=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${process.env.RESEND_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({from:'Lokly <onboarding@resend.dev>',to:emailDestinations,subject:`${isTest?'[TEST] ':''}Quittance de loyer — ${formatMois(quittance.mois)}`,html:`<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px"><h2>Quittance de loyer</h2><p>Bonjour ${quittance.locataires?.nom??''},<br/>Veuillez trouver ci-joint votre quittance pour <strong>${formatMois(quittance.mois)}</strong>.</p><div style="background:#f1f5f9;border-radius:12px;padding:16px"><strong>Montant total : ${quittance.total} EUR</strong><p>${quittance.biens?.nom??''}${lotLibelle?` — ${lotLibelle}`:''} — ${quittance.biens?.ville??''}</p></div></div>`,attachments:[{filename:fileName,content:pdfBase64}]})})
   if(!resendRes.ok){console.error('Resend error:',await resendRes.json());return NextResponse.json({error:'La quittance a été générée mais l’envoi par e-mail a échoué.'},{status:502})}
   await supabase.from('quittances').update({envoyee:true,date_signature:new Date().toISOString()}).eq('id',quittanceId)
   await supabase.from('otp_codes').delete().eq('quittance_id',quittanceId)
   return NextResponse.json({ok:true})
- }catch(err){console.error('quittance-signer error:',err);return NextResponse.json({error:'Erreur serveur'},{status:500})}
+ }catch(err){console.error('quittance-signer error:',err);return NextResponse.json({error:'Erreur serveur'},{status:500})
 }
