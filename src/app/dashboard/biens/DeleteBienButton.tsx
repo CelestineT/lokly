@@ -17,6 +17,8 @@ export default function DeleteBienButton({ id, nom }: { id: string; nom: string 
       setLoading(false)
       return
     }
+    // Le bien n'existe plus : ne pas rafraîchir sa fiche, revenir à la liste.
+    router.replace('/dashboard/biens')
     router.refresh()
   }
 
