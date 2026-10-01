@@ -1,175 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 
-type Bien = {
-  id: string
-  nom: string
-  ville: string
-  prix_achat: number | null
-}
-
-type Locataire = {
-  bien_id: string
-  date_entree: string
-  date_sortie: string | null
-  actif: boolean
-}
-
-function tauxVacance(locataires: Locataire[], bienId: string): number {
-  const aujourd = new Date()
-  const debutAnnee = new Date(aujourd.getFullYear(), 0, 1)
-  const joursAnnee = Math.floor((aujourd.getTime() - debutAnnee.getTime()) / 86400000) || 1
-
-  const joursOccupes = locataires
-    .filter(l => l.bien_id === bienId)
-    .reduce((total, l) => {
-      const entree = new Date(l.date_entree)
-      const sortie = l.date_sortie ? new Date(l.date_sortie) : aujourd
-      const debut = entree < debutAnnee ? debutAnnee : entree
-      const fin = sortie > aujourd ? aujourd : sortie
-      const jours = Math.max(0, Math.floor((fin.getTime() - debut.getTime()) / 86400000))
-      return total + jours
-    }, 0)
-
-  const vacance = Math.max(0, Math.min(100, ((joursAnnee - joursOccupes) / joursAnnee) * 100))
-  return Math.round(vacance * 10) / 10
-}
-
-function tauxRotation(locataires: Locataire[], bienId: string): number {
-  const anneeEnCours = new Date().getFullYear()
-  const departs = locataires.filter(l =>
-    l.bien_id === bienId &&
-    l.date_sortie &&
-    new Date(l.date_sortie).getFullYear() === anneeEnCours
-  ).length
-  return departs
-}
-
-export default async function RentabilitePage() {
-  const supabase = await createClient()
-
-  const [{ data: biensData }, { data: quittancesData }, { data: depensesData }, { data: locatairesData }] =
-    await Promise.all([
-      supabase.from('biens').select('id, nom, ville, prix_achat').order('nom'),
-      supabase.from('quittances').select('bien_id, locataire_id, total, mois'),
-      supabase.from('depenses').select('bien_id, montant'),
-      supabase.from('locataires').select('bien_id, date_entree, date_sortie, actif'),
-    ])
-
-  const biens: Bien[] = biensData ?? []
-  const locataires: Locataire[] = locatairesData ?? []
-
-  const stats = biens.map((bien) => {
-    const recettes = (quittancesData ?? [])
-      .filter((q) => q.bien_id === bien.id)
-      .reduce((sum, q) => sum + q.total, 0)
-    const depenses = (depensesData ?? [])
-      .filter((d) => d.bien_id === bien.id)
-      .reduce((sum, d) => sum + d.montant, 0)
-    const resultat = recettes - depenses
-    const rendement = bien.prix_achat && bien.prix_achat > 0
-      ? ((recettes / bien.prix_achat) * 100)
-      : null
-    const vacance = tauxVacance(locataires, bien.id)
-    const rotation = tauxRotation(locataires, bien.id)
-    return { bien, recettes, depenses, resultat, rendement, vacance, rotation }
-  })
-
-  const totalRecettes = stats.reduce((s, x) => s + x.recettes, 0)
-  const totalDepenses = stats.reduce((s, x) => s + x.depenses, 0)
-  const totalResultat = totalRecettes - totalDepenses
-
-  return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Rentabilité</h1>
-        <p className="text-slate-500 text-sm mt-1">Vue d&apos;ensemble de vos recettes, dépenses et indicateurs par bien.</p>
-      </div>
-
-      {/* Totaux */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Recettes totales</p>
-          <p className="text-2xl font-bold text-emerald-600">{totalRecettes.toLocaleString('fr-FR')} €</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Dépenses totales</p>
-          <p className="text-2xl font-bold text-rose-500">{totalDepenses.toLocaleString('fr-FR')} €</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Résultat net</p>
-          <p className={`text-2xl font-bold ${totalResultat >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-            {totalResultat >= 0 ? '+' : ''}{totalResultat.toLocaleString('fr-FR')} €
-          </p>
-        </div>
-      </div>
-
-      {/* Par bien */}
-      {stats.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 flex flex-col items-center text-center">
-          <p className="text-slate-500 text-sm">Ajoutez des biens pour voir leur rentabilité.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {stats.map(({ bien, recettes, depenses, resultat, rendement, vacance, rotation }) => (
-            <div key={bien.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-              <div className="flex items-start justify-between gap-3 mb-4">
-                <div>
-                  <h3 className="font-semibold text-slate-900">{bien.nom}</h3>
-                  <p className="text-xs text-slate-400">{bien.ville}</p>
-                </div>
-                {rendement !== null && (
-                  <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                    {rendement.toFixed(2)} % brut
-                  </span>
-                )}
-              </div>
-
-              {/* Financier */}
-              <div className="grid grid-cols-3 gap-4 mb-4">
-                <div>
-                  <p className="text-xs text-slate-500 mb-0.5">Recettes</p>
-                  <p className="font-semibold text-emerald-600">{recettes.toLocaleString('fr-FR')} €</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 mb-0.5">Dépenses</p>
-                  <p className="font-semibold text-rose-500">{depenses.toLocaleString('fr-FR')} €</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 mb-0.5">Résultat</p>
-                  <p className={`font-semibold ${resultat >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                    {resultat >= 0 ? '+' : ''}{resultat.toLocaleString('fr-FR')} €
-                  </p>
-                </div>
-              </div>
-
-              {/* KPI */}
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">Taux de vacance (année en cours)</p>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 bg-slate-100 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full ${vacance > 20 ? 'bg-rose-400' : vacance > 5 ? 'bg-amber-400' : 'bg-emerald-400'}`}
-                        style={{ width: `${Math.min(vacance, 100)}%` }}
-                      />
-                    </div>
-                    <span className={`text-sm font-bold ${vacance > 20 ? 'text-rose-500' : vacance > 5 ? 'text-amber-500' : 'text-emerald-600'}`}>
-                      {vacance} %
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">Rotation locative (année en cours)</p>
-                  <p className="text-sm font-bold text-slate-800">
-                    {rotation} départ{rotation !== 1 ? 's' : ''}
-                    <span className="text-xs font-normal text-slate-400 ml-1">cette année</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
+type Bien={id:string;nom:string;ville:string;type:string;prix_achat:number|null;date_acquisition:string|null}
+type Lot={id:string;bien_id:string;type:string}
+type Bail={id:string;bien_id:string;lot_id:string|null;date_entree:string;date_sortie:string|null;loyer_hc:number;charges:number;actif:boolean}
+type Quittance={bien_id:string;total:number;mois:string}
+type Depense={bien_id:string|null;montant:number;date_depense:string}
+type Financement={bien_id:string;mensualite:number|null;assurance_mensuelle:number|null}
+const HAB=new Set(['appartement','studio','maison'])
+const DAY=86400000
+const n=(v:number|null|undefined)=>Number(v??0)
+const euro=(v:number)=>new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
+function d(s:string){return new Date(`${s}T00:00:00`)}
+function days(a:Date,b:Date){return Math.max(0,Math.floor((b.getTime()-a.getTime())/DAY)+1)}
+function overlap(a1:Date,a2:Date,b1:Date,b2:Date){const start=new Date(Math.max(a1.getTime(),b1.getTime())),end=new Date(Math.min(a2.getTime(),b2.getTime()));return start<=end?days(start,end):0}
+function vacancyForUnit(bien:Bien,lotId:string|null,baux:Bail[],yearStart:Date,today:Date){const acquisition=bien.date_acquisition?d(bien.date_acquisition):yearStart;const start=acquisition>yearStart?acquisition:yearStart;if(start>today)return null;const denominator=days(start,today);const relevant=baux.filter(b=>b.bien_id===bien.id&&(lotId?b.lot_id===lotId:!b.lot_id));const intervals=relevant.map(b=>{const s=d(b.date_entree);const e=b.date_sortie?d(b.date_sortie):today;return {s:s<start?start:s,e:e>today?today:e}}).filter(x=>x.s<=x.e).sort((a,b)=>a.s.getTime()-b.s.getTime());let occupied=0,lastEnd:Date|null=null;for(const x of intervals){const s=lastEnd&&x.s<=new Date(lastEnd.getTime()+DAY)?new Date(lastEnd.getTime()+DAY):x.s;if(s<=x.e)occupied+=days(s,x.e);if(!lastEnd||x.e>lastEnd)lastEnd=x.e}return Math.max(0,Math.min(100,((denominator-occupied)/denominator)*100))}
+export default async function RentabilitePage(){const s=await createClient();const today=new Date(),year=today.getFullYear(),yearStart=new Date(year,0,1),yearPrefix=`${year}-`;const[{data:biensD},{data:lotsD},{data:bauxD},{data:qD},{data:depD},{data:finD}]=await Promise.all([s.from('biens').select('id,nom,ville,type,prix_achat,date_acquisition').order('nom'),s.from('lots').select('id,bien_id,type'),s.from('baux').select('id,bien_id,lot_id,date_entree,date_sortie,loyer_hc,charges,actif'),s.from('quittances').select('bien_id,total,mois'),s.from('depenses').select('bien_id,montant,date_depense'),s.from('financements').select('bien_id,mensualite,assurance_mensuelle')]);const biens=(biensD??[]) as Bien[],lots=(lotsD??[]) as Lot[],baux=(bauxD??[]) as Bail[],qs=(qD??[]) as Quittance[],deps=(depD??[]) as Depense[],fins=(finD??[]) as Financement[];const stats=biens.map(bien=>{const bienLots=lots.filter(l=>l.bien_id===bien.id&&HAB.has(l.type));const unitIds=bienLots.length?bienLots.map(l=>l.id):[null];const vacancies=unitIds.map(id=>vacancyForUnit(bien,id,baux,yearStart,today)).filter((v):v is number=>v!==null);const vacance=vacancies.length?vacancies.reduce((a,b)=>a+b,0)/vacancies.length:null;const recettes=qs.filter(q=>q.bien_id===bien.id&&String(q.mois).startsWith(yearPrefix)).reduce((a,q)=>a+n(q.total),0);const depenses=deps.filter(x=>x.bien_id===bien.id&&x.date_depense?.startsWith(yearPrefix)).reduce((a,x)=>a+n(x.montant),0);const annualLoyer=baux.filter(b=>b.bien_id===bien.id&&b.actif).reduce((a,b)=>a+n(b.loyer_hc)*12,0);const rendement= n(bien.prix_achat)>0?annualLoyer/n(bien.prix_achat)*100:null;const mensualites=fins.filter(f=>f.bien_id===bien.id).reduce((a,f)=>a+n(f.mensualite)+n(f.assurance_mensuelle),0);const monthsElapsed=today.getMonth()+1;const detteYtd=mensualites*monthsElapsed;const margeBrute=recettes-depenses;const cashflow=margeBrute-detteYtd;const margeNettePct=recettes>0?cashflow/recettes*100:null;return{bien,recettes,depenses,margeBrute,cashflow,margeNettePct,rendement,vacance,mensualites}});const T=stats.reduce((a,x)=>({r:a.r+x.recettes,d:a.d+x.depenses,c:a.c+x.cashflow}),{r:0,d:0,c:0});return <div className="p-6 max-w-6xl mx-auto"><div className="mb-6"><h1 className="text-2xl font-bold">Rentabilité & cash-flow</h1><p className="text-sm text-slate-500 mt-1">Indicateurs {year}. La vacance commence à la date d’acquisition et, pour un immeuble, se calcule logement par logement.</p></div><div className="grid md:grid-cols-4 gap-4 mb-7"><K label="Recettes encaissées" value={euro(T.r)}/><K label="Dépenses" value={euro(T.d)}/><K label="Marge brute" value={euro(T.r-T.d)}/><K label="Cash-flow après dette" value={euro(T.c)}/></div><div className="space-y-4">{stats.map(x=><div key={x.bien.id} className="bg-white border rounded-2xl p-5"><div className="flex justify-between gap-3 mb-5"><div><h2 className="font-semibold">{x.bien.nom}</h2><p className="text-xs text-slate-400">{x.bien.ville}</p></div><div className="text-right">{x.rendement!==null&&<p className="font-bold text-blue-600">{x.rendement.toFixed(2)} % brut</p>}<p className="text-xs text-slate-400">Rentabilité théorique annualisée HC</p></div></div><div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm"><Info l="Vacance" v={x.vacance===null?'—':`${x.vacance.toFixed(1)} %`}/><Info l="Marge brute YTD" v={euro(x.margeBrute)}/><Info l="Crédit + assurance / mois" v={euro(x.mensualites)}/><Info l="Cash-flow YTD" v={euro(x.cashflow)}/></div><div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mt-4 pt-4 border-t"><Info l="Recettes YTD" v={euro(x.recettes)}/><Info l="Dépenses YTD" v={euro(x.depenses)}/><Info l="Marge nette financière" v={x.margeNettePct===null?'—':`${x.margeNettePct.toFixed(1)} %`}/><Info l="Date d’acquisition" v={x.bien.date_acquisition?d(x.bien.date_acquisition).toLocaleDateString('fr-FR'):'À renseigner'}/></div></div>)}</div><div className="mt-6 text-xs text-slate-400">Cash-flow = recettes encaissées − dépenses − mensualités de crédit − assurance emprunteur. Les calculs n’incluent pas encore la fiscalité.</div></div>}
+function K({label,value}:{label:string;value:string}){return <div className="bg-white border rounded-2xl p-5"><p className="text-xs uppercase tracking-wide text-slate-500">{label}</p><p className="text-xl font-bold mt-1">{value}</p></div>}
+function Info({l,v}:{l:string;v:string}){return <div><p className="text-slate-500 text-xs">{l}</p><p className="font-semibold mt-1">{v}</p></div>}
