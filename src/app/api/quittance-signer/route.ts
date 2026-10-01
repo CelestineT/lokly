@@ -53,3 +53,4 @@ export async function POST(req:NextRequest){
   return NextResponse.json({ok:true})
  }catch(err){console.error('quittance-signer error:',err);return NextResponse.json({error:'Erreur serveur'},{status:500})
 }
+}
