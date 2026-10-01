@@ -1,225 +1,41 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
-type Quittance = {
-  id: string
-  locataire_id: string
-  mois: string
-  total: number
-  envoyee: boolean
+type Bien={id:string;nom:string;ville:string;type:string;prix_achat:number|null;date_acquisition:string|null}
+type Lot={id:string;bien_id:string;type:string}
+type Bail={id:string;bien_id:string;lot_id:string|null;date_entree:string;date_sortie:string|null;loyer_hc:number;actif:boolean}
+type Quittance={id:string;bien_id:string;locataire_id:string;mois:string;total:number;envoyee:boolean}
+type Depense={bien_id:string|null;montant:number;date_depense:string}
+type Financement={bien_id:string;mensualite:number|null;assurance_mensuelle:number|null}
+type Locataire={id:string;nom:string}
+
+const HAB_BIEN=new Set(['appartement','maison','studio'])
+const HAB_LOT=new Set(['appartement','studio','maison'])
+const HORS=new Set(['parking','box','garage','cave','local_commercial','local-commercial','local commercial'])
+const DAY=86400000
+const n=(v:number|null|undefined)=>Number(v??0)
+const euro=(v:number)=>new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v)
+const ds=(s:string)=>new Date(`${s}T00:00:00`)
+const days=(a:Date,b:Date)=>Math.max(0,Math.floor((b.getTime()-a.getTime())/DAY)+1)
+function overlap(a1:Date,a2:Date,b1:Date,b2:Date){const s=new Date(Math.max(a1.getTime(),b1.getTime())),e=new Date(Math.min(a2.getTime(),b2.getTime()));return s<=e?days(s,e):0}
+function fmtMonth(m:string){const[y,mo]=m.split('-');return new Date(+y,+mo-1,1).toLocaleDateString('fr-FR',{month:'short',year:'numeric'}).replace(/^./,c=>c.toUpperCase())}
+function vacancy(bien:Bien,lotId:string|null,baux:Bail[],start:Date,end:Date){const acq=bien.date_acquisition?ds(bien.date_acquisition):start;const s=acq>start?acq:start;if(s>end)return null;const den=days(s,end);const intervals=baux.filter(b=>b.bien_id===bien.id&&(lotId?b.lot_id===lotId:!b.lot_id)).map(b=>({s:ds(b.date_entree),e:b.date_sortie?ds(b.date_sortie):end})).map(x=>({s:x.s<s?s:x.s,e:x.e>end?end:x.e})).filter(x=>x.s<=x.e).sort((a,b)=>a.s.getTime()-b.s.getTime());let occ=0,last:Date|null=null;for(const x of intervals){const ns=last&&x.s<=new Date(last.getTime()+DAY)?new Date(last.getTime()+DAY):x.s;if(ns<=x.e)occ+=days(ns,x.e);if(!last||x.e>last)last=x.e}return Math.max(0,Math.min(100,(den-occ)/den*100))}
+
+export default function DashboardPage(){
+ const[loading,setLoading]=useState(true),[year,setYear]=useState(new Date().getFullYear())
+ const[biens,setBiens]=useState<Bien[]>([]),[lots,setLots]=useState<Lot[]>([]),[baux,setBaux]=useState<Bail[]>([]),[qs,setQs]=useState<Quittance[]>([]),[deps,setDeps]=useState<Depense[]>([]),[fins,setFins]=useState<Financement[]>([]),[locs,setLocs]=useState<Locataire[]>([])
+ useEffect(()=>{const s=createClient();Promise.all([s.from('biens').select('id,nom,ville,type,prix_achat,date_acquisition'),s.from('lots').select('id,bien_id,type'),s.from('baux').select('id,bien_id,lot_id,date_entree,date_sortie,loyer_hc,actif'),s.from('quittances').select('id,bien_id,locataire_id,mois,total,envoyee').order('mois',{ascending:false}),s.from('depenses').select('bien_id,montant,date_depense'),s.from('financements').select('bien_id,mensualite,assurance_mensuelle'),s.from('locataires').select('id,nom')]).then(r=>{setBiens((r[0].data??[]) as Bien[]);setLots((r[1].data??[]) as Lot[]);setBaux((r[2].data??[]) as Bail[]);setQs((r[3].data??[]) as Quittance[]);setDeps((r[4].data??[]) as Depense[]);setFins((r[5].data??[]) as Financement[]);setLocs((r[6].data??[]) as Locataire[]);setLoading(false)})},[])
+ const years=useMemo(()=>{const ys=new Set<number>([new Date().getFullYear()]);qs.forEach(q=>ys.add(+q.mois.slice(0,4)));deps.forEach(d=>d.date_depense&&ys.add(+d.date_depense.slice(0,4)));biens.forEach(b=>b.date_acquisition&&ys.add(+b.date_acquisition.slice(0,4)));const min=Math.min(...ys);for(let y=min;y<=new Date().getFullYear();y++)ys.add(y);return [...ys].sort((a,b)=>b-a)},[qs,deps,biens])
+ const calc=useMemo(()=>{const now=new Date(),end=year===now.getFullYear()?now:new Date(year,11,31),start=new Date(year,0,1),prefix=`${year}-`;const recettes=qs.filter(q=>q.mois.startsWith(prefix)).reduce((a,q)=>a+n(q.total),0),depenses=deps.filter(d=>d.date_depense?.startsWith(prefix)).reduce((a,d)=>a+n(d.montant),0);const vacs:number[]=[];biens.forEach(b=>{const bl=lots.filter(l=>l.bien_id===b.id&&HAB_LOT.has(l.type));(bl.length?bl.map(l=>l.id):HAB_BIEN.has(b.type)?[null]:[]).forEach(id=>{const v=vacancy(b,id,baux,start,end);if(v!==null)vacs.push(v)})});const vacance=vacs.length?vacs.reduce((a,b)=>a+b,0)/vacs.length:null;const annual=baux.filter(b=>b.actif).reduce((a,b)=>a+n(b.loyer_hc)*12,0),prix=biens.reduce((a,b)=>a+n(b.prix_achat),0),rendement=prix>0?annual/prix*100:null;const monthlyDebt=fins.reduce((a,f)=>a+n(f.mensualite)+n(f.assurance_mensuelle),0),months=year===now.getFullYear()?now.getMonth()+1:12,marge=recettes-depenses,cash=marge-monthlyDebt*months,net=recettes>0?cash/recettes*100:null;const monthly=Array.from({length:12},(_,i)=>{const key=`${year}-${String(i+1).padStart(2,'0')}`,r=qs.filter(q=>q.mois===key).reduce((a,q)=>a+n(q.total),0),d=deps.filter(x=>x.date_depense?.startsWith(key)).reduce((a,x)=>a+n(x.montant),0);return{label:new Date(year,i,1).toLocaleDateString('fr-FR',{month:'short'}),recettes:r,depenses:d,cash:r-d-monthlyDebt}});return{recettes,depenses,vacance,rendement,marge,cash,net,monthly}},[year,biens,lots,baux,qs,deps,fins])
+ const logements=biens.filter(b=>HAB_BIEN.has(b.type)).length+lots.filter(l=>HAB_LOT.has(l.type)).length,hors=biens.filter(b=>HORS.has(b.type)).length+lots.filter(l=>HORS.has(l.type)).length,locMap=new Map(locs.map(l=>[l.id,l.nom]));const recent=qs.slice(0,5)
+ return <div className="p-6 max-w-6xl mx-auto"><div className="flex flex-wrap items-end justify-between gap-4 mb-7"><div><h1 className="text-2xl font-bold text-slate-900">Tableau de bord</h1><p className="text-sm text-slate-500 mt-1">Pilotage patrimonial et financier</p></div><label className="text-xs text-slate-500">Période<select value={year} onChange={e=>setYear(+e.target.value)} className="block mt-1 border rounded-lg px-3 py-2 bg-white text-sm text-slate-900">{years.map(y=><option key={y}>{y}</option>)}</select></label></div>
+ <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-7"><K l="Logements" v={loading?'…':String(logements)} href="/dashboard/biens"/><K l="Biens hors logements" v={loading?'…':String(hors)} href="/dashboard/biens"/><K l="Dépenses" v={loading?'…':euro(calc.depenses)} href="/dashboard/depenses"/><K l="Taux de vacance" v={loading?'…':calc.vacance===null?'—':`${calc.vacance.toFixed(1)} %`} href="/dashboard/rentabilite"/><K l="Rentabilité brute" v={loading?'…':calc.rendement===null?'—':`${calc.rendement.toFixed(2)} %`} href="/dashboard/rentabilite"/><K l="Marge brute" v={loading?'…':euro(calc.marge)} href="/dashboard/rentabilite"/><K l="Cash-flow après dette" v={loading?'…':euro(calc.cash)} href="/dashboard/rentabilite"/><K l="Marge nette financière" v={loading?'…':calc.net===null?'—':`${calc.net.toFixed(1)} %`} href="/dashboard/rentabilite"/></div>
+ <div className="grid lg:grid-cols-2 gap-5 mb-8"><Chart title="Recettes et dépenses" data={calc.monthly} keys={['recettes','depenses']}/><Chart title="Cash-flow mensuel" data={calc.monthly} keys={['cash']}/></div>
+ <div><div className="flex items-center justify-between mb-4"><div><h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Historique des quittances</h2><p className="text-xs text-slate-400 mt-1">Les dernières quittances restent accessibles avec leur statut.</p></div><Link href="/dashboard/quittances" className="text-xs text-blue-600 hover:underline">Voir tout →</Link></div>{loading?<div className="h-32 bg-slate-100 rounded-2xl animate-pulse"/>:recent.length===0?<div className="bg-white border rounded-2xl p-8 text-center text-sm text-slate-400">Aucune quittance</div>:<div className="bg-white rounded-2xl border divide-y">{recent.map(q=><Link key={q.id} href={`/dashboard/quittances/${q.id}`} className="flex justify-between items-center px-5 py-4 hover:bg-slate-50"><div><p className="font-medium text-sm">{locMap.get(q.locataire_id)??'—'}</p><p className="text-xs text-slate-400">{fmtMonth(q.mois)}</p></div><div className="flex items-center gap-3"><b className="text-sm">{euro(q.total)}</b><span className={`text-xs px-2 py-1 rounded-full ${q.envoyee?'bg-green-100 text-green-700':'bg-amber-100 text-amber-700'}`}>{q.envoyee?'Envoyée':'À envoyer'}</span></div></Link>)}</div>}</div>
+ <p className="mt-6 text-xs text-slate-400">Les KPI et graphiques suivent l’année sélectionnée. Le cash-flow déduit les dépenses, les mensualités de crédit et l’assurance emprunteur ; la fiscalité n’est pas encore incluse.</p></div>
 }
-
-type Locataire = { id: string; nom: string }
-type Bien = { id: string; type: string }
-type Lot = { id: string; type: string }
-
-const TYPES_LOGEMENT_BIEN = new Set(['appartement', 'maison', 'studio'])
-const TYPES_LOGEMENT_LOT = new Set(['appartement', 'studio'])
-const TYPES_HORS_LOGEMENT = new Set(['parking', 'box', 'garage', 'cave', 'local_commercial', 'local-commercial', 'local commercial'])
-
-function formatMois(mois: string): string {
-  const [year, month] = mois.split('-')
-  const date = new Date(Number(year), Number(month) - 1, 1)
-  return date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
-    .replace(/^./, (c) => c.toUpperCase())
-}
-
-function getCurrentMois(): string {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, '0')
-  return `${y}-${m}`
-}
-
-export default function DashboardPage() {
-  const [logements, setLogements] = useState(0)
-  const [biensHorsLogement, setBiensHorsLogement] = useState(0)
-  const [locataires, setLocataires] = useState(0)
-  const [quittances, setQuittances] = useState<Quittance[]>([])
-  const [locatairesMap, setLocatairesMap] = useState<Map<string, string>>(new Map())
-  const [loading, setLoading] = useState(true)
-
-  const moisCourant = getCurrentMois()
-
-  useEffect(() => {
-    const supabase = createClient()
-    Promise.all([
-      supabase.from('biens').select('id,type'),
-      supabase.from('lots').select('id,type'),
-      supabase.from('locataires').select('id', { count: 'exact', head: true }).eq('actif', true),
-      supabase.from('quittances').select('id, locataire_id, mois, total, envoyee').order('mois', { ascending: false }).limit(20),
-      supabase.from('locataires').select('id, nom'),
-    ]).then(([biensRes, lotsRes, locatairesRes, quittancesRes, locatairesData]) => {
-      const biens = (biensRes.data ?? []) as Bien[]
-      const lots = (lotsRes.data ?? []) as Lot[]
-
-      // Un immeuble de rapport est un contenant : ses logements sont comptés via ses lots,
-      // afin de ne pas compter l'immeuble lui-même comme un logement supplémentaire.
-      setLogements(
-        biens.filter((b) => TYPES_LOGEMENT_BIEN.has(b.type)).length +
-        lots.filter((l) => TYPES_LOGEMENT_LOT.has(l.type)).length
-      )
-
-      // Les biens hors logements correspondent aux unités exploitables séparément
-      // (box, parking, garage, cave, local commercial), qu'elles soient autonomes ou en lot.
-      setBiensHorsLogement(
-        biens.filter((b) => TYPES_HORS_LOGEMENT.has(b.type)).length +
-        lots.filter((l) => TYPES_HORS_LOGEMENT.has(l.type)).length
-      )
-
-      setLocataires(locatairesRes.count ?? 0)
-      if (quittancesRes.data) setQuittances(quittancesRes.data)
-      if (locatairesData.data) {
-        setLocatairesMap(new Map((locatairesData.data as Locataire[]).map((l) => [l.id, l.nom])))
-      }
-      setLoading(false)
-    })
-  }, [])
-
-  const quittancesMois = quittances.filter((q) => q.mois === moisCourant)
-  const totalMois = quittancesMois.reduce((sum, q) => sum + q.total, 0)
-  const aEnvoyer = quittancesMois.filter((q) => !q.envoyee).length
-  const tauxEnvoi = quittancesMois.length > 0
-    ? Math.round((quittancesMois.filter((q) => q.envoyee).length / quittancesMois.length) * 100)
-    : 0
-
-  const dernieresQuittances = quittances.slice(0, 5)
-
-  const kpis = [
-    {
-      label: 'Logements',
-      value: loading ? '…' : String(logements),
-      href: '/dashboard/biens',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-        </svg>
-      ),
-      color: 'bg-blue-50 text-blue-600',
-    },
-    {
-      label: 'Biens hors logements',
-      value: loading ? '…' : String(biensHorsLogement),
-      href: '/dashboard/biens',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M5 7l1 13h12l1-13M9 11v5m6-5v5" />
-        </svg>
-      ),
-      color: 'bg-sky-50 text-sky-600',
-    },
-    {
-      label: 'Locataires actifs',
-      value: loading ? '…' : String(locataires),
-      href: '/dashboard/locataires',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
-      color: 'bg-violet-50 text-violet-600',
-    },
-    {
-      label: `Loyers ${formatMois(moisCourant)}`,
-      value: loading ? '…' : `${totalMois.toLocaleString('fr-FR')} €`,
-      href: '/dashboard/paiements',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      color: 'bg-emerald-50 text-emerald-600',
-    },
-    {
-      label: 'Quittances à envoyer',
-      value: loading ? '…' : String(aEnvoyer),
-      href: '/dashboard/quittances',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-      ),
-      color: aEnvoyer > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-400',
-    },
-    {
-      label: 'Taux d\'envoi ce mois',
-      value: loading ? '…' : `${tauxEnvoi} %`,
-      href: '/dashboard/quittances',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
-      color: tauxEnvoi === 100 ? 'bg-green-50 text-green-600' : 'bg-slate-50 text-slate-500',
-    },
-  ]
-
-  return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">Tableau de bord</h1>
-        <p className="text-slate-500 text-sm mt-1">{formatMois(moisCourant)}</p>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-10">
-        {kpis.map((kpi) => (
-          <Link key={kpi.label} href={kpi.href} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${kpi.color}`}>
-              {kpi.icon}
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 font-medium">{kpi.label}</p>
-              <p className="text-2xl font-bold text-slate-900">{kpi.value}</p>
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Dernières quittances</h2>
-          <Link href="/dashboard/quittances" className="text-xs text-blue-600 hover:underline">
-            Voir tout →
-          </Link>
-        </div>
-
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-slate-100 rounded-2xl animate-pulse" />
-            ))}
-          </div>
-        ) : dernieresQuittances.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 text-center">
-            <p className="text-slate-400 text-sm">Aucune quittance pour le moment</p>
-            <Link href="/dashboard/quittances/nouvelle"
-              className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors mt-4">
-              Créer une quittance
-            </Link>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm divide-y divide-slate-50">
-            {dernieresQuittances.map((q) => (
-              <Link key={q.id} href={`/dashboard/quittances/${q.id}`}
-                className="flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors first:rounded-t-2xl last:rounded-b-2xl">
-                <div>
-                  <p className="font-medium text-slate-900 text-sm">{locatairesMap.get(q.locataire_id) ?? '—'}</p>
-                  <p className="text-xs text-slate-400">{formatMois(q.mois)}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-slate-900 text-sm">{q.total.toLocaleString('fr-FR')} €</span>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${q.envoyee ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {q.envoyee ? 'Envoyée' : 'À envoyer'}
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+function K({l,v,href}:{l:string;v:string;href:string}){return <Link href={href} className="bg-white border rounded-2xl p-5 hover:shadow-md transition-shadow"><p className="text-xs uppercase tracking-wide text-slate-500">{l}</p><p className="text-xl font-bold mt-1">{v}</p></Link>}
+function Chart({title,data,keys}:{title:string;data:{label:string;recettes:number;depenses:number;cash:number}[];keys:('recettes'|'depenses'|'cash')[]}){const vals=data.flatMap(d=>keys.map(k=>d[k])),max=Math.max(1,...vals.map(Math.abs)),W=600,H=210,pad=28;const pts=(k:'recettes'|'depenses'|'cash')=>data.map((d,i)=>`${pad+i*(W-2*pad)/11},${H/2-d[k]/max*(H/2-pad)}`).join(' ');return <div className="bg-white border rounded-2xl p-5"><h2 className="font-semibold text-sm mb-4">{title}</h2><svg viewBox={`0 0 ${W} ${H}`} className="w-full h-52" role="img" aria-label={title}><line x1={pad} y1={H/2} x2={W-pad} y2={H/2} stroke="currentColor" opacity=".15"/>{keys.map((k,idx)=><polyline key={k} points={pts(k)} fill="none" stroke="currentColor" opacity={idx===0?1:.45} strokeWidth={idx===0?3:2}/>) }{data.map((d,i)=><text key={d.label} x={pad+i*(W-2*pad)/11} y={H-5} textAnchor="middle" fontSize="10" fill="currentColor" opacity=".5">{d.label}</text>)}</svg><div className="flex gap-4 text-xs text-slate-500">{keys.map(k=><span key={k} className="capitalize">— {k}</span>)}</div></div>}
