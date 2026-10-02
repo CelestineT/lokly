@@ -3,11 +3,13 @@ import { PDFDocument, rgb, StandardFonts, PDFFont } from 'pdf-lib'
 const MOIS_FR=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
 const mois=(value:string)=>{const[y,m]=value.split('-');const label=MOIS_FR[Number(m)-1];return `${label.charAt(0).toUpperCase()}${label.slice(1)} ${y}`}
 const eur=(value:number)=>`${Number(value??0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/\u202f/g,' ')} EUR`
+const LOT_LABELS:Record<string,string>={box:'Box',parking:'Parking',garage:'Garage',cave:'Cave'}
 function wrap(text:string,font:PDFFont,size:number,maxWidth:number){const out:string[]=[];let line='';for(const word of text.split(' ')){const test=line?`${line} ${word}`:word;if(line&&font.widthOfTextAtSize(test,size)>maxWidth){out.push(line);line=word}else line=test}if(line)out.push(line);return out}
 
+export type QuittancePdfLotAnnexe={numero_lot?:string;type?:string;prix_mensuel:number}
 export type QuittancePdfV3Params={
   locataireNom:string; proprietaireNom:string; bienNom:string; bienAdresse:string; bienVille:string;
-  lotLibelle?:string; mois:string; loyerHc:number; charges:number; solde:number; total:number;
+  lotLibelle?:string; mois:string; loyerHc:number; charges:number; lotsAnnexes?:QuittancePdfLotAnnexe[]; solde:number; total:number;
   signatureDataUrl?:string; dateSignature:string
 }
 
@@ -29,11 +31,14 @@ export async function generateQuittancePdfV3(p:QuittancePdfV3Params):Promise<Uin
  page.drawText([p.bienAdresse,p.bienVille].filter(Boolean).join(', '),{x:x+14,y:y-49,size:9.5,font:regular,color:muted});
  if(p.lotLibelle)page.drawText(p.lotLibelle,{x:x+14,y:y-67,size:9.5,font:bold,color:navy});
  y-=118;page.drawText('DETAIL DU REGLEMENT',{x,y,size:8,font:bold,color:blue});y-=22;
- page.drawRectangle({x,y:y-102,width:right-x,height:112,borderColor:border,borderWidth:1});page.drawRectangle({x,y:y-102,width:right-x,height:30,color:soft});
- const rows:Array<[string,string]>=[['Loyer hors charges',eur(p.loyerHc)],['Charges',eur(p.charges)]];if(Number(p.solde)!==0)rows.push(['Solde / regularisation',eur(p.solde)]);
- let ry=y-13;for(const[label,amount]of rows){page.drawText(label,{x:x+14,y:ry,size:10,font:regular,color:muted});page.drawText(amount,{x:right-14-regular.widthOfTextAtSize(amount,10),y:ry,size:10,font:regular,color:navy});ry-=24}
- const ty=y-92,total=eur(p.total);page.drawText('TOTAL ACQUITTE',{x:x+14,y:ty,size:11,font:bold,color:navy});page.drawText(total,{x:right-14-bold.widthOfTextAtSize(total,11),y:ty,size:11,font:bold,color:blue});
- y-=145;page.drawText('ATTESTATION',{x,y,size:8,font:bold,color:blue});y-=22;
+ const rows:Array<[string,string]>=[['Loyer hors charges',eur(p.loyerHc)],['Charges',eur(p.charges)]];
+ for(const lot of p.lotsAnnexes??[]){const type=String(lot.type??'lot');const label=LOT_LABELS[type]??type.replace(/_/g,' ');rows.push([`${label}${lot.numero_lot?` · ${lot.numero_lot}`:''}`,eur(lot.prix_mensuel)])}
+ if(Number(p.solde)!==0)rows.push(['Solde / regularisation',eur(p.solde)]);
+ const rowHeight=24,totalHeight=30,boxHeight=Math.max(112,rows.length*rowHeight+totalHeight+10);
+ page.drawRectangle({x,y:y-boxHeight+10,width:right-x,height:boxHeight,borderColor:border,borderWidth:1});page.drawRectangle({x,y:y-boxHeight+10,width:right-x,height:totalHeight,color:soft});
+ let ry=y-13;for(const[label,amount]of rows){page.drawText(label,{x:x+14,y:ry,size:10,font:regular,color:muted});page.drawText(amount,{x:right-14-regular.widthOfTextAtSize(amount,10),y:ry,size:10,font:regular,color:navy});ry-=rowHeight}
+ const ty=y-boxHeight+20,total=eur(p.total);page.drawText('TOTAL ACQUITTE',{x:x+14,y:ty,size:11,font:bold,color:navy});page.drawText(total,{x:right-14-bold.widthOfTextAtSize(total,11),y:ty,size:11,font:bold,color:blue});
+ y-=boxHeight+33;page.drawText('ATTESTATION',{x,y,size:8,font:bold,color:blue});y-=22;
  const legal=`Je soussigne(e), ${p.proprietaireNom}, bailleur du logement designe ci-dessus, reconnais avoir recu de ${p.locataireNom} la somme de ${eur(p.total)} au titre du loyer et des charges pour ${mois(p.mois)} et lui en donne quittance, sous reserve de tous mes droits.`;
  for(const line of wrap(legal,regular,10,right-x)){page.drawText(line,{x,y,size:10,font:regular,color:muted});y-=16}
  y-=20;page.drawText(`Fait le ${p.dateSignature}`,{x,y,size:9.5,font:regular,color:muted});y-=25;page.drawText('Signature du bailleur',{x,y,size:9,font:bold,color:navy});y-=8;
