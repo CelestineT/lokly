@@ -51,10 +51,11 @@ export default async function LocatairesPage() {
     const titre = estGroupe ? groupe.occupants.map((o) => o.nom).join(' & ') : principal.nom
     const badgeOccupation = typeOccupation === 'bail_commun' ? `Bail commun · ${groupe.occupants.length} occupants` : typeOccupation === 'colocation' ? `Colocation · ${groupe.occupants.length} colocataires` : 'Location individuelle'
     const lotLabel = lot ? [lot.numero_lot ? `Lot ${lot.numero_lot}` : 'Lot', lot.type_lot, lot.specificite].filter(Boolean).join(' — ') : null
+    const ficheHref = `/dashboard/locataires/${principal.id}`
 
     return (
       <div key={groupe.key} className="relative bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
-        <Link href={`/dashboard/locataires/${principal.id}`} className="absolute inset-0 rounded-2xl" aria-label={`Consulter ${titre}`} />
+        <Link href={ficheHref} className="absolute inset-0 rounded-2xl" aria-label={`Consulter ${titre}`} />
         <div className="flex items-start justify-between gap-3 mb-3 pointer-events-none">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -73,8 +74,8 @@ export default async function LocatairesPage() {
           <span className="text-slate-400">{termine && dateSortie ? `Sortie le ${dateSortie}` : `Entrée le ${dateEntree}`}</span>
         </div>
         <div className="relative z-10 mt-3 flex justify-end gap-2">
-          <Link href={`/dashboard/locataires/${principal.id}`} className="inline-flex items-center border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Consulter</Link>
-          <Link href={`/dashboard/locataires/${principal.id}/modifier`} className="inline-flex items-center border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Modifier</Link>
+          <Link href={ficheHref} className="inline-flex items-center border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Consulter</Link>
+          {!estGroupe && <Link href={`/dashboard/locataires/${principal.id}/modifier`} className="inline-flex items-center border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Modifier</Link>}
           {!estGroupe && <DeleteLocataireButton id={principal.id} nom={principal.nom} />}
         </div>
       </div>
