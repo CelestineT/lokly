@@ -52,6 +52,7 @@ export default async function LocatairesPage() {
     const badgeOccupation = typeOccupation === 'bail_commun' ? `Bail commun · ${groupe.occupants.length} occupants` : typeOccupation === 'colocation' ? `Colocation · ${groupe.occupants.length} colocataires` : 'Location individuelle'
     const lotLabel = lot ? [lot.numero_lot ? `Lot ${lot.numero_lot}` : 'Lot', lot.type_lot, lot.specificite].filter(Boolean).join(' — ') : null
     const ficheHref = `/dashboard/locataires/${principal.id}`
+    const modifierHref = estGroupe ? ficheHref : `/dashboard/locataires/${principal.id}/modifier`
 
     return (
       <div key={groupe.key} className="relative bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
@@ -75,7 +76,7 @@ export default async function LocatairesPage() {
         </div>
         <div className="relative z-10 mt-3 flex justify-end gap-2">
           <Link href={ficheHref} className="inline-flex items-center border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Consulter</Link>
-          <Link href={`/dashboard/locataires/${principal.id}/modifier`} className="inline-flex items-center border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Modifier</Link>
+          <Link href={modifierHref} className="inline-flex items-center border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Modifier</Link>
           <DeleteLocataireButton id={principal.id} nom={estGroupe ? titre : principal.nom} />
         </div>
       </div>
