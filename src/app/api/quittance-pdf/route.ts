@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
       .single()
     if (error || !quittance) return NextResponse.json({ error: 'Quittance introuvable' }, { status: 404 })
 
-    const { data: profile } = await supabase.from('profiles').select('nom, prenom, signature_base64').eq('id', user.id).single()
+    const { data: profile } = await supabase.from('profiles').select('nom, prenom, telephone, signature_base64').eq('id', user.id).single()
     const proprietaireNom = profile ? `${profile.prenom ?? ''} ${profile.nom ?? ''}`.trim() || user.email! : user.email!
     const reference = `EKO-${String(quittance.mois ?? '').replace('-', '')}-${String(quittance.id).slice(0, 6).toUpperCase()}`
     const signatureDate = quittance.date_signature ? new Date(quittance.date_signature) : new Date()
@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
       locataireEmail: cleanPdfText(quittance.locataires?.email ?? ''),
       proprietaireNom: cleanPdfText(proprietaireNom),
       proprietaireEmail: cleanPdfText(user.email ?? ''),
+      proprietaireTelephone: cleanPdfText(profile?.telephone ?? ''),
       bienNom: cleanPdfText(quittance.biens?.nom ?? ''),
       bienAdresse: cleanPdfText(quittance.biens?.adresse ?? ''),
       bienVille: cleanPdfText(quittance.biens?.ville ?? ''),
