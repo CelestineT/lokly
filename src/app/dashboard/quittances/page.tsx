@@ -48,12 +48,20 @@ export default function QuittancesPage() {
   const locatairesMap = new Map(locataires.map((l) => [l.id, l]))
   const biensMap = new Map(biens.map((b) => [b.id, b]))
 
-  const grouped = new Map<string, Quittance[]>()
+  // Niveau 1 : période. Niveau 2 : bien.
+  // On privilégie le bien_id historisé sur la quittance ; le bien actuel du
+  // locataire ne sert que de fallback pour les anciennes quittances.
+  const grouped = new Map<string, Map<string, Quittance[]>>()
   for (const q of quittances) {
-    const list = grouped.get(q.mois) ?? []
+    const locataire = locatairesMap.get(q.locataire_id)
+    const bienId = q.bien_id ?? locataire?.bien_id ?? 'sans-bien'
+    const byBien = grouped.get(q.mois) ?? new Map<string, Quittance[]>()
+    const list = byBien.get(bienId) ?? []
     list.push(q)
-    grouped.set(q.mois, list)
+    byBien.set(bienId, list)
+    grouped.set(q.mois, byBien)
   }
+
   const sortedMois = Array.from(grouped.keys()).sort((a, b) => b.localeCompare(a))
 
   return (
@@ -84,41 +92,72 @@ export default function QuittancesPage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-10">
           {sortedMois.map((mois) => {
-            const items = grouped.get(mois)!
+            const byBien = grouped.get(mois)!
+            const sortedBienIds = Array.from(byBien.keys()).sort((a, b) => {
+              const ba = biensMap.get(a)
+              const bb = biensMap.get(b)
+              const la = ba ? `${ba.nom} ${ba.ville}` : 'ZZZ'
+              const lb = bb ? `${bb.nom} ${bb.ville}` : 'ZZZ'
+              return la.localeCompare(lb, 'fr')
+            })
+
             return (
-              <div key={mois}>
-                <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">{formatMois(mois)}</h2>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {items.map((q) => {
-                    const locataire = locatairesMap.get(q.locataire_id)
-                    const bien = locataire ? biensMap.get(locataire.bien_id) : null
+              <section key={mois}>
+                <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
+                  {formatMois(mois)}
+                </h2>
+
+                <div className="space-y-6">
+                  {sortedBienIds.map((bienId) => {
+                    const items = byBien.get(bienId)!
+                    const bien = biensMap.get(bienId)
+
                     return (
-                      <Link key={q.id} href={`/dashboard/quittances/${q.id}`} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 block hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div>
-                            <h3 className="font-semibold text-slate-900">{locataire?.nom ?? '—'}</h3>
-                            {bien && <p className="text-xs text-slate-400">{bien.nom} — {bien.ville}</p>}
-                          </div>
-                          <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${q.envoyee ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {q.envoyee ? 'Envoyée' : 'À signer'}
+                      <div key={bienId}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-slate-400">⌂</span>
+                          <h3 className="text-sm font-semibold text-slate-800">
+                            {bien ? `${bien.nom}${bien.ville ? ` — ${bien.ville}` : ''}` : 'Bien non renseigné'}
+                          </h3>
+                          <span className="text-xs text-slate-400">
+                            {items.length} quittance{items.length !== 1 ? 's' : ''}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between text-sm mt-3 pt-3 border-t border-slate-50">
-                          <span className="font-bold text-slate-900">{q.total.toLocaleString('fr-FR')} €</span>
-                          <span className="text-slate-400 text-xs">{q.loyer_hc.toLocaleString('fr-FR')} HC + {q.charges.toLocaleString('fr-FR')} charges</span>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {items.map((q) => {
+                            const locataire = locatairesMap.get(q.locataire_id)
+                            return (
+                              <Link key={q.id} href={`/dashboard/quittances/${q.id}`} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 block hover:shadow-md transition-shadow">
+                                <div className="flex items-start justify-between gap-3 mb-3">
+                                  <div>
+                                    <h4 className="font-semibold text-slate-900">{locataire?.nom ?? '—'}</h4>
+                                    {bien && <p className="text-xs text-slate-400">{bien.nom} — {bien.ville}</p>}
+                                  </div>
+                                  <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${q.envoyee ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    {q.envoyee ? 'Envoyée' : 'À signer'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm mt-3 pt-3 border-t border-slate-50">
+                                  <span className="font-bold text-slate-900">{q.total.toLocaleString('fr-FR')} €</span>
+                                  <span className="text-slate-400 text-xs">{q.loyer_hc.toLocaleString('fr-FR')} HC + {q.charges.toLocaleString('fr-FR')} charges</span>
+                                </div>
+                                {!q.envoyee && (
+                                  <div className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium">
+                                    ✍🏿 Signer et envoyer
+                                  </div>
+                                )}
+                              </Link>
+                            )
+                          })}
                         </div>
-                        {!q.envoyee && (
-                          <div className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium">
-                            ✍🏿 Signer et envoyer
-                          </div>
-                        )}
-                      </Link>
+                      </div>
                     )
                   })}
                 </div>
-              </div>
+              </section>
             )
           })}
         </div>
