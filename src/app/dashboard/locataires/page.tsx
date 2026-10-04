@@ -5,7 +5,7 @@ import DeleteLocataireButton from './DeleteLocataireButton'
 type Locataire = { id:string; bien_id:string; bail_id:string|null; est_principal:boolean|null; nom:string; email:string; date_entree:string; date_sortie:string|null; loyer_hc:number; charges:number; caution_payee:boolean; actif:boolean; created_at:string }
 type Bien = { id:string; nom:string; adresse:string; ville:string }
 type Bail = { id:string; bien_id:string; lot_id:string|null; type_occupation:string; date_entree:string; date_sortie:string|null; loyer_hc:number; charges:number; caution_payee:boolean; actif:boolean; created_at:string }
-type Lot = { id:string; bien_id:string; numero_lot:string|null; nom_personnalise:string|null; type_lot:string|null; specificite:string|null }
+type Lot = { id:string; bien_id:string; numero_lot:string|null; nom_personnalise:string|null; type:string|null; specificite:string|null }
 type GroupeOccupation = { key:string; bail:Bail|null; occupants:Locataire[] }
 
 export default async function LocatairesPage() {
@@ -13,7 +13,7 @@ export default async function LocatairesPage() {
   const { data: locatairesData } = await supabase.from('locataires').select('*').order('created_at', { ascending: false })
   const { data: biensData } = await supabase.from('biens').select('id, nom, adresse, ville')
   const { data: bauxData } = await supabase.from('baux').select('id, bien_id, lot_id, type_occupation, date_entree, date_sortie, loyer_hc, charges, caution_payee, actif, created_at')
-  const { data: lotsData } = await supabase.from('lots').select('id, bien_id, numero_lot, nom_personnalise, type_lot, specificite')
+  const { data: lotsData } = await supabase.from('lots').select('id, bien_id, numero_lot, nom_personnalise, type, specificite')
 
   const locataires: Locataire[] = locatairesData ?? []
   const biens: Bien[] = biensData ?? []
@@ -69,7 +69,7 @@ export default async function LocatairesPage() {
           {!termine && <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full flex-shrink-0 ${cautionPayee ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{cautionPayee ? 'Caution reçue' : 'Caution en attente'}</span>}
         </div>
         {bien && <p className="text-sm text-slate-500 mb-1 pointer-events-none">⌂ {bien.nom} — {bien.ville}</p>}
-        {lotLabel && <p className="text-xs text-slate-400 mb-3 pointer-events-none">Lot : {lotLabel}</p>}
+        {lotLabel && <p className="text-xs text-slate-400 mb-3 pointer-events-none">Lot occupé : {lotLabel}</p>}
         <div className="flex items-center justify-between text-sm mt-3 pt-3 border-t border-slate-50 pointer-events-none">
           <div><span className="font-semibold text-slate-900">{total.toLocaleString('fr-FR')} € CC</span>{estGroupe && typeOccupation === 'bail_commun' && <span className="block text-[11px] text-slate-400 font-normal">Loyer du bail — compté une seule fois</span>}</div>
           <span className="text-slate-400">{termine && dateSortie ? `Sortie le ${dateSortie}` : `Entrée le ${dateEntree}`}</span>
