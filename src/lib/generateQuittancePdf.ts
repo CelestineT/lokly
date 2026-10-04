@@ -37,15 +37,26 @@ export interface QuittancePdfData {
   locataireEmail: string
   proprietaireNom: string
   proprietaireEmail: string
+  proprietaireTelephone?: string
   bienAdresse: string
   bienVille: string
   bienNom: string
+  lotNom?: string
+  typeLogement?: string
+  specificiteLogement?: string
+  surface?: number | string
   mois: string
   reference: string
   loyerHc: number
   charges: number
   solde: number
   total: number
+  fraisAnnexes?: number
+  regularisationCharges?: number
+  modePaiement?: string
+  commentaire?: string
+  iban?: string
+  bic?: string
   signatureDataUrl?: string
   dateSignature: string
 }
@@ -56,91 +67,148 @@ export async function generateQuittancePdf(params: QuittancePdfData): Promise<Ui
   const { width, height } = page.getSize()
   const regular = await pdfDoc.embedFont(StandardFonts.Helvetica)
   const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
-  const navy = rgb(0.035, 0.075, 0.16), blue = rgb(0.11, 0.22, 0.86), blueSoft = rgb(0.94, 0.96, 1)
-  const blueLine = rgb(0.77, 0.82, 1), slate = rgb(0.34, 0.41, 0.52), lightText = rgb(0.47, 0.55, 0.67)
-  const border = rgb(0.86, 0.89, 0.93), soft = rgb(0.975, 0.98, 0.99), white = rgb(1, 1, 1)
-  const margin = 42, contentWidth = width - margin * 2
 
-  page.drawText('EKOLOCS', { x: margin, y: height - 54, size: 21, font: bold, color: blue })
-  page.drawText('Gestion locative', { x: margin, y: height - 70, size: 8.5, font: regular, color: lightText })
-  page.drawText('QUITTANCE DE LOYER', { x: 210, y: height - 55, size: 17, font: bold, color: navy })
-  page.drawText(formatMois(params.mois), { x: 210, y: height - 74, size: 10.5, font: regular, color: slate })
-  const refLabel = `Reference : ${params.reference}`
-  page.drawText(refLabel, { x: width - margin - regular.widthOfTextAtSize(refLabel, 8), y: height - 72, size: 8, font: regular, color: lightText })
-  page.drawLine({ start: { x: margin, y: height - 92 }, end: { x: width - margin, y: height - 92 }, thickness: 1.5, color: blue })
+  const navy = rgb(0.035, 0.075, 0.16)
+  const blue = rgb(0.11, 0.22, 0.86)
+  const slate = rgb(0.34, 0.41, 0.52)
+  const lightText = rgb(0.47, 0.55, 0.67)
+  const border = rgb(0.82, 0.86, 0.92)
+  const soft = rgb(0.975, 0.98, 0.99)
+  const blueSoft = rgb(0.96, 0.97, 1)
+  const white = rgb(1, 1, 1)
 
-  const cardsY = height - 112, cardH = 92, gap = 12, cardW = (contentWidth - gap) / 2
-  page.drawRectangle({ x: margin, y: cardsY - cardH, width: cardW, height: cardH, color: soft, borderColor: border, borderWidth: 0.8 })
-  page.drawRectangle({ x: margin + cardW + gap, y: cardsY - cardH, width: cardW, height: cardH, color: soft, borderColor: border, borderWidth: 0.8 })
-  page.drawText('INFORMATIONS DU BAILLEUR', { x: margin + 14, y: cardsY - 20, size: 8, font: bold, color: blue })
-  page.drawText(params.proprietaireNom || '-', { x: margin + 14, y: cardsY - 42, size: 11, font: bold, color: navy })
-  if (params.proprietaireEmail) page.drawText(params.proprietaireEmail, { x: margin + 14, y: cardsY - 60, size: 8.5, font: regular, color: slate })
-  const rightX = margin + cardW + gap
-  page.drawText('INFORMATIONS DU LOCATAIRE', { x: rightX + 14, y: cardsY - 20, size: 8, font: bold, color: blue })
-  page.drawText(params.locataireNom || '-', { x: rightX + 14, y: cardsY - 42, size: 11, font: bold, color: navy })
-  if (params.locataireEmail) page.drawText(params.locataireEmail, { x: rightX + 14, y: cardsY - 60, size: 8.5, font: regular, color: slate })
+  const margin = 42
+  const contentWidth = width - margin * 2
+  const gap = 10
 
-  let y = cardsY - cardH - 18
-  page.drawRectangle({ x: margin, y: y - 64, width: contentWidth, height: 64, color: blueSoft, borderColor: blueLine, borderWidth: 0.8 })
-  page.drawText('BIEN LOUE', { x: margin + 14, y: y - 18, size: 8, font: bold, color: blue })
-  page.drawText(params.bienNom || 'Bien loue', { x: margin + 14, y: y - 38, size: 11, font: bold, color: navy })
-  page.drawText(cleanPdfText(`${params.bienAdresse}${params.bienVille ? ` - ${params.bienVille}` : ''}`), { x: margin + 14, y: y - 54, size: 8.5, font: regular, color: slate })
+  // En-tête inspiré du croquis : marque / titre / période + numéro.
+  page.drawText('EKOLOCS', { x: margin, y: height - 48, size: 20, font: bold, color: blue })
+  page.drawText('Gestion locative', { x: margin, y: height - 63, size: 8, font: regular, color: lightText })
+  page.drawText('QUITTANCE DE LOYER', { x: 198, y: height - 48, size: 16, font: bold, color: navy })
+  page.drawText(formatMois(params.mois), { x: 198, y: height - 64, size: 9.5, font: regular, color: slate })
+  const ref = `N° quittance : ${params.reference}`
+  page.drawText(ref, { x: width - margin - regular.widthOfTextAtSize(ref, 7.5), y: height - 64, size: 7.5, font: regular, color: lightText })
+  page.drawLine({ start: { x: margin, y: height - 80 }, end: { x: width - margin, y: height - 80 }, thickness: 1.2, color: blue })
 
-  y -= 84
-  page.drawText('DETAIL DU REGLEMENT', { x: margin, y, size: 9, font: bold, color: navy }); y -= 16
-  const tableX = margin, tableW = contentWidth, amountW = 125, labelW = tableW - amountW, rowH = 27
-  page.drawRectangle({ x: tableX, y: y - rowH, width: tableW, height: rowH, color: navy })
-  page.drawText('LIBELLE', { x: tableX + 12, y: y - 18, size: 8, font: bold, color: white })
-  page.drawText('MONTANT', { x: tableX + labelW + 12, y: y - 18, size: 8, font: bold, color: white }); y -= rowH
-  const rows = [{ label: 'Loyer hors charges', value: params.loyerHc }, { label: 'Charges', value: params.charges }]
-  if (params.solde !== 0) rows.push({ label: 'Solde anterieur', value: params.solde })
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]
-    page.drawRectangle({ x: tableX, y: y - rowH, width: tableW, height: rowH, color: i % 2 === 0 ? white : soft, borderColor: border, borderWidth: 0.5 })
-    page.drawLine({ start: { x: tableX + labelW, y }, end: { x: tableX + labelW, y: y - rowH }, thickness: 0.5, color: border })
-    page.drawText(row.label, { x: tableX + 12, y: y - 18, size: 9, font: regular, color: slate })
-    const value = eur(row.value)
-    page.drawText(value, { x: tableX + tableW - 12 - regular.widthOfTextAtSize(value, 9), y: y - 18, size: 9, font: regular, color: navy }); y -= rowH
+  // Informations bailleur / locataire.
+  const infoY = height - 98
+  const infoH = 78
+  const infoW = (contentWidth - gap) / 2
+  page.drawRectangle({ x: margin, y: infoY - infoH, width: infoW, height: infoH, color: white, borderColor: border, borderWidth: 0.7 })
+  page.drawRectangle({ x: margin + infoW + gap, y: infoY - infoH, width: infoW, height: infoH, color: white, borderColor: border, borderWidth: 0.7 })
+  page.drawText('INFORMATIONS DU BAILLEUR', { x: margin + 12, y: infoY - 17, size: 7.5, font: bold, color: blue })
+  page.drawText(params.proprietaireNom || '-', { x: margin + 12, y: infoY - 35, size: 10, font: bold, color: navy })
+  if (params.proprietaireTelephone) page.drawText(params.proprietaireTelephone, { x: margin + 12, y: infoY - 50, size: 8, font: regular, color: slate })
+  if (params.proprietaireEmail) page.drawText(params.proprietaireEmail, { x: margin + 12, y: infoY - 64, size: 8, font: regular, color: slate })
+
+  const locX = margin + infoW + gap
+  page.drawText('INFORMATIONS DU LOCATAIRE', { x: locX + 12, y: infoY - 17, size: 7.5, font: bold, color: blue })
+  page.drawText(params.locataireNom || '-', { x: locX + 12, y: infoY - 35, size: 10, font: bold, color: navy })
+  if (params.locataireEmail) page.drawText(params.locataireEmail, { x: locX + 12, y: infoY - 52, size: 8, font: regular, color: slate })
+
+  // Immeuble / adresse de la location / type de logement.
+  let y = infoY - infoH - 14
+  const propertyH = 66
+  const propertyW = (contentWidth - gap * 2) / 3
+  const blocks = [
+    { title: 'IMMEUBLE', lines: [params.bienNom || '-'] },
+    { title: 'ADRESSE DE LA LOCATION', lines: [params.bienAdresse || '-', params.bienVille || ''] },
+    { title: 'TYPE DE LOGEMENT', lines: [params.typeLogement || 'A renseigner', params.specificiteLogement || params.lotNom || '', params.surface ? `${params.surface} m²` : ''] },
+  ]
+  blocks.forEach((block, index) => {
+    const x = margin + index * (propertyW + gap)
+    page.drawRectangle({ x, y: y - propertyH, width: propertyW, height: propertyH, color: blueSoft, borderColor: border, borderWidth: 0.7 })
+    page.drawText(block.title, { x: x + 10, y: y - 16, size: 6.8, font: bold, color: blue })
+    let lineY = y - 34
+    block.lines.filter(Boolean).slice(0, 3).forEach((line, i) => {
+      page.drawText(cleanPdfText(String(line)), { x: x + 10, y: lineY, size: i === 0 ? 8.5 : 7.5, font: i === 0 ? bold : regular, color: i === 0 ? navy : slate })
+      lineY -= 13
+    })
+  })
+
+  // Message / informations + tableau financier, comme sur le croquis.
+  y -= propertyH + 14
+  const financeH = 180
+  const messageW = 150
+  const financeX = margin + messageW + gap
+  const financeW = contentWidth - messageW - gap
+
+  page.drawRectangle({ x: margin, y: y - financeH, width: messageW, height: financeH, color: white, borderColor: border, borderWidth: 0.7 })
+  page.drawText('MESSAGE / INFORMATIONS', { x: margin + 10, y: y - 17, size: 7, font: bold, color: blue })
+  const message = params.commentaire || 'Aucune information complémentaire.'
+  drawWrappedText(page, message, margin + 10, y - 37, messageW - 20, regular, 7.5, slate, 10)
+
+  page.drawText('LIBELLE', { x: financeX + 10, y: y - 15, size: 7, font: bold, color: navy })
+  page.drawText('MONTANT HT', { x: financeX + financeW - 122, y: y - 15, size: 6.5, font: bold, color: navy })
+  page.drawText('MONTANT TTC', { x: financeX + financeW - 62, y: y - 15, size: 6.5, font: bold, color: navy })
+  page.drawRectangle({ x: financeX, y: y - financeH, width: financeW, height: financeH, borderColor: border, borderWidth: 0.7 })
+  const col1 = financeX + financeW - 135
+  const col2 = financeX + financeW - 70
+  page.drawLine({ start: { x: col1, y }, end: { x: col1, y: y - financeH }, thickness: 0.5, color: border })
+  page.drawLine({ start: { x: col2, y }, end: { x: col2, y: y - financeH }, thickness: 0.5, color: border })
+
+  const financialRows: Array<{ label: string; value?: number; detail?: string }> = [
+    { label: 'Loyer', value: params.loyerHc },
+    { label: 'Charges (acompte)', value: params.charges, detail: 'Eau / gaz / électricité / internet selon sélection' },
+    { label: `Solde dû${params.mois ? ` au ${formatMois(params.mois)}` : ''}`, value: params.solde || undefined },
+    { label: 'Frais annexes', value: params.fraisAnnexes },
+    { label: 'Régularisation des charges', value: params.regularisationCharges },
+  ]
+  const headerH = 25
+  const rowH = 25
+  let rowTop = y - headerH
+  page.drawLine({ start: { x: financeX, y: rowTop }, end: { x: financeX + financeW, y: rowTop }, thickness: 0.6, color: border })
+  for (const row of financialRows) {
+    const labelY = rowTop - 16
+    page.drawText(row.label, { x: financeX + 10, y: labelY, size: 7.2, font: regular, color: slate })
+    if (row.detail) page.drawText(row.detail, { x: financeX + 10, y: labelY - 8, size: 5.3, font: regular, color: lightText })
+    if (row.value !== undefined && Number(row.value) !== 0) {
+      const value = eur(Number(row.value))
+      page.drawText(value, { x: financeX + financeW - 8 - regular.widthOfTextAtSize(value, 7), y: labelY, size: 7, font: regular, color: navy })
+    }
+    rowTop -= rowH
+    page.drawLine({ start: { x: financeX, y: rowTop }, end: { x: financeX + financeW, y: rowTop }, thickness: 0.5, color: border })
   }
-  for (const label of ['Lot annexe / complement', 'Regularisation des charges']) {
-    page.drawRectangle({ x: tableX, y: y - 22, width: tableW, height: 22, color: white, borderColor: border, borderWidth: 0.5 })
-    page.drawLine({ start: { x: tableX + labelW, y }, end: { x: tableX + labelW, y: y - 22 }, thickness: 0.5, color: border })
-    page.drawText(label, { x: tableX + 12, y: y - 15, size: 7.5, font: regular, color: lightText })
-    page.drawText('-', { x: tableX + tableW - 18, y: y - 15, size: 8, font: regular, color: lightText }); y -= 22
-  }
-  page.drawRectangle({ x: tableX, y: y - 34, width: tableW, height: 34, color: blueSoft, borderColor: blueLine, borderWidth: 0.8 })
-  page.drawText('TOTAL RECU', { x: tableX + 12, y: y - 22, size: 10, font: bold, color: navy })
+
+  const totalY = y - financeH + 8
+  page.drawText('TOTAL ECHEANCE', { x: financeX + 10, y: totalY, size: 8.5, font: bold, color: navy })
   const totalText = eur(params.total)
-  page.drawText(totalText, { x: tableX + tableW - 12 - bold.widthOfTextAtSize(totalText, 11), y: y - 22, size: 11, font: bold, color: blue }); y -= 52
+  page.drawText(totalText, { x: financeX + financeW - 8 - bold.widthOfTextAtSize(totalText, 9), y: totalY, size: 9, font: bold, color: blue })
 
-  page.drawText('INFORMATIONS COMPLEMENTAIRES', { x: margin, y, size: 8, font: bold, color: blue }); y -= 14
-  page.drawRectangle({ x: margin, y: y - 46, width: contentWidth, height: 46, color: soft, borderColor: border, borderWidth: 0.6 })
-  page.drawText('Mode de paiement', { x: margin + 12, y: y - 17, size: 7.5, font: bold, color: lightText })
-  page.drawText('A renseigner', { x: margin + 12, y: y - 34, size: 8.5, font: regular, color: slate })
-  page.drawText('Commentaire', { x: margin + 190, y: y - 17, size: 7.5, font: bold, color: lightText })
-  page.drawText('Aucun commentaire', { x: margin + 190, y: y - 34, size: 8.5, font: regular, color: slate }); y -= 64
+  // Mode de paiement sous le tableau, sans bandeau sombre.
+  y -= financeH + 13
+  page.drawText('MODE DE PAIEMENT', { x: margin, y, size: 7, font: bold, color: blue })
+  page.drawText(params.modePaiement || 'A renseigner', { x: margin + 100, y, size: 7.5, font: regular, color: slate })
 
-  const legal = `Je soussigne(e), ${params.proprietaireNom}, bailleur du logement designe ci-dessus, declare avoir recu de ${params.locataireNom} la somme de ${eur(params.total)} au titre du loyer et des charges du mois de ${formatMois(params.mois)}, et lui en donne quittance, sous reserve de tous mes droits.`
-  y = drawWrappedText(page, legal, margin, y, contentWidth, regular, 8.2, slate, 11); y -= 13
-  const bottomCardH = 78, bottomW = (contentWidth - gap) / 2
-  page.drawRectangle({ x: margin, y: y - bottomCardH, width: bottomW, height: bottomCardH, color: soft, borderColor: border, borderWidth: 0.6 })
-  page.drawText('COORDONNEES BANCAIRES', { x: margin + 12, y: y - 17, size: 7.5, font: bold, color: blue })
-  page.drawText('IBAN : a renseigner dans les parametres', { x: margin + 12, y: y - 37, size: 7.5, font: regular, color: slate })
-  page.drawText('BIC : a renseigner dans les parametres', { x: margin + 12, y: y - 53, size: 7.5, font: regular, color: slate })
-  const sigX = margin + bottomW + gap
-  page.drawRectangle({ x: sigX, y: y - bottomCardH, width: bottomW, height: bottomCardH, color: white, borderColor: border, borderWidth: 0.6 })
-  page.drawText(`Fait le ${params.dateSignature}`, { x: sigX + 12, y: y - 17, size: 7.5, font: regular, color: slate })
-  page.drawText('Signature du bailleur', { x: sigX + 12, y: y - 33, size: 7.5, font: bold, color: navy })
+  y -= 22
+  const legal = `Je soussigne(e), ${params.proprietaireNom}, bailleur du logement désigné ci-dessus, déclare avoir reçu de ${params.locataireNom} la somme de ${eur(params.total)} au titre du loyer et des charges du mois de ${formatMois(params.mois)}, et lui en donne quittance, sous réserve de tous mes droits.`
+  y = drawWrappedText(page, legal, margin, y, contentWidth, regular, 7.5, slate, 10)
+
+  // Coordonnées bancaires / signature.
+  y -= 8
+  const bottomH = 72
+  const bankW = (contentWidth - gap) / 2
+  page.drawRectangle({ x: margin, y: y - bottomH, width: bankW, height: bottomH, color: soft, borderColor: border, borderWidth: 0.6 })
+  page.drawText('COORDONNEES BANCAIRES', { x: margin + 10, y: y - 16, size: 7, font: bold, color: blue })
+  page.drawText(`BIC : ${params.bic || 'à renseigner dans les paramètres'}`, { x: margin + 10, y: y - 35, size: 7, font: regular, color: slate })
+  page.drawText(`IBAN : ${params.iban || 'à renseigner dans les paramètres'}`, { x: margin + 10, y: y - 51, size: 7, font: regular, color: slate })
+
+  const sigX = margin + bankW + gap
+  page.drawRectangle({ x: sigX, y: y - bottomH, width: bankW, height: bottomH, color: white, borderColor: border, borderWidth: 0.6 })
+  page.drawText(`Fait le ${params.dateSignature}`, { x: sigX + 10, y: y - 16, size: 7, font: regular, color: slate })
+  page.drawText('Signature du bailleur', { x: sigX + 10, y: y - 31, size: 7, font: bold, color: navy })
   if (params.signatureDataUrl?.includes('base64,')) {
     try {
       const bytes = Buffer.from(params.signatureDataUrl.split('base64,')[1], 'base64')
       let image
       try { image = await pdfDoc.embedPng(bytes) } catch { image = await pdfDoc.embedJpg(bytes) }
-      const dims = image.scaleToFit(bottomW - 30, 34)
-      page.drawImage(image, { x: sigX + 12, y: y - 70, width: dims.width, height: dims.height })
+      const dims = image.scaleToFit(bankW - 30, 31)
+      page.drawImage(image, { x: sigX + 10, y: y - 67, width: dims.width, height: dims.height })
     } catch (error) { console.error('Erreur signature PDF:', error) }
   }
-  page.drawText('Ekolocs - Quittance generee automatiquement', { x: margin, y: 24, size: 6.8, font: regular, color: lightText })
-  page.drawText(params.reference, { x: width - margin - regular.widthOfTextAtSize(params.reference, 6.8), y: 24, size: 6.8, font: regular, color: lightText })
+
+  page.drawText('Ekolocs - Quittance générée automatiquement', { x: margin, y: 22, size: 6.5, font: regular, color: lightText })
+  page.drawText(params.reference, { x: width - margin - regular.widthOfTextAtSize(params.reference, 6.5), y: 22, size: 6.5, font: regular, color: lightText })
+
   return pdfDoc.save()
 }
