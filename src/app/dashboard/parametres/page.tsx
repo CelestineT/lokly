@@ -17,6 +17,9 @@ export default function ParametresPage() {
   const [prenom, setPrenom] = useState('')
   const [email, setEmail] = useState('')
   const [telephone, setTelephone] = useState('')
+  const [titulaireCompte, setTitulaireCompte] = useState('')
+  const [iban, setIban] = useState('')
+  const [bic, setBic] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
   const [savedProfile, setSavedProfile] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
@@ -35,7 +38,7 @@ export default function ParametresPage() {
         return
       }
       setEmail(user.email ?? '')
-      const { data, error } = await supabase.from('profiles').select('nom, prenom, email, telephone, signature_base64').eq('id', user.id).maybeSingle()
+      const { data, error } = await supabase.from('profiles').select('nom, prenom, email, telephone, titulaire_compte, iban, bic, signature_base64').eq('id', user.id).maybeSingle()
       if (!active) return
       if (error) {
         console.error('Chargement du profil impossible:', error)
@@ -45,6 +48,9 @@ export default function ParametresPage() {
         setPrenom(data.prenom ?? '')
         setEmail(data.email ?? user.email ?? '')
         setTelephone(data.telephone ?? '')
+        setTitulaireCompte(data.titulaire_compte ?? '')
+        setIban(data.iban ?? '')
+        setBic(data.bic ?? '')
         if (data.signature_base64) setSavedSignature(data.signature_base64)
       }
       setLoadingProfile(false)
@@ -91,15 +97,15 @@ export default function ParametresPage() {
     setSavingProfile(true);setSavedProfile(false);setProfileError(null)
     const supabase=createClient();const {data:{user},error:authError}=await supabase.auth.getUser()
     if(authError||!user){setProfileError(authError?.message||'Session utilisateur introuvable.');setSavingProfile(false);return}
-    const payload={id:user.id,nom:nom.trim()||null,prenom:prenom.trim()||null,email:email.trim()||user.email||null,telephone:telephone.trim()||null}
-    const {data,error}=await supabase.from('profiles').upsert(payload,{onConflict:'id'}).select('nom, prenom, email, telephone').single()
+    const payload={id:user.id,nom:nom.trim()||null,prenom:prenom.trim()||null,email:email.trim()||user.email||null,telephone:telephone.trim()||null,titulaire_compte:titulaireCompte.trim()||null,iban:iban.replace(/\s+/g,'').toUpperCase()||null,bic:bic.replace(/\s+/g,'').toUpperCase()||null}
+    const {data,error}=await supabase.from('profiles').upsert(payload,{onConflict:'id'}).select('nom, prenom, email, telephone, titulaire_compte, iban, bic').single()
     if(error){console.error('Sauvegarde profil impossible:',error);setProfileError(`Les informations n’ont pas été sauvegardées : ${error.message}`);setSavingProfile(false);return}
-    setNom(data.nom??'');setPrenom(data.prenom??'');setEmail(data.email??user.email??'');setTelephone(data.telephone??'');setSavingProfile(false);setSavedProfile(true);setTimeout(()=>setSavedProfile(false),3000)
+    setNom(data.nom??'');setPrenom(data.prenom??'');setEmail(data.email??user.email??'');setTelephone(data.telephone??'');setTitulaireCompte(data.titulaire_compte??'');setIban(data.iban??'');setBic(data.bic??'');setSavingProfile(false);setSavedProfile(true);setTimeout(()=>setSavedProfile(false),3000)
   }
 
   const inputClass="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
   return <div className="p-6 max-w-2xl mx-auto space-y-8">
-    <div><h1 className="text-2xl font-bold text-slate-900">Paramètres</h1><p className="text-slate-500 text-sm mt-1">Gérez votre profil et votre signature.</p></div>
+    <div><h1 className="text-2xl font-bold text-slate-900">Paramètres</h1><p className="text-slate-500 text-sm mt-1">Gérez votre profil, vos coordonnées bancaires et votre signature.</p></div>
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
       <h2 className="text-base font-semibold text-slate-800">Informations bailleur</h2><p className="text-sm text-slate-500">Ces informations apparaissent sur vos quittances.</p>
       {loadingProfile&&<div className="text-sm text-slate-500">Chargement des informations…</div>}
@@ -108,6 +114,12 @@ export default function ParametresPage() {
         <div><label className="block text-sm font-medium text-slate-700 mb-1">Nom</label><input type="text" value={nom} onChange={e=>{setNom(e.target.value);setSavedProfile(false)}} className={inputClass}/></div>
         <div><label className="block text-sm font-medium text-slate-700 mb-1">Adresse e-mail</label><input type="email" value={email} onChange={e=>{setEmail(e.target.value);setSavedProfile(false)}} placeholder="nom@exemple.fr" className={inputClass}/></div>
         <div><label className="block text-sm font-medium text-slate-700 mb-1">Téléphone</label><input type="tel" value={telephone} onChange={e=>{setTelephone(e.target.value);setSavedProfile(false)}} placeholder="06 00 00 00 00" className={inputClass}/></div>
+      </div>
+      <div className="border-t border-slate-100 pt-4 space-y-4">
+        <div><h3 className="text-sm font-semibold text-slate-800">Coordonnées bancaires</h3><p className="text-xs text-slate-500 mt-1">Facultatives. Elles pourront être affichées sur les quittances pour faciliter les règlements.</p></div>
+        <div><label className="block text-sm font-medium text-slate-700 mb-1">Titulaire du compte</label><input type="text" value={titulaireCompte} onChange={e=>{setTitulaireCompte(e.target.value);setSavedProfile(false)}} placeholder="Prénom NOM ou raison sociale" className={inputClass}/></div>
+        <div><label className="block text-sm font-medium text-slate-700 mb-1">IBAN</label><input type="text" value={iban} onChange={e=>{setIban(e.target.value.toUpperCase());setSavedProfile(false)}} placeholder="FR76 …" autoCapitalize="characters" autoComplete="off" className={inputClass}/></div>
+        <div className="sm:max-w-xs"><label className="block text-sm font-medium text-slate-700 mb-1">BIC / SWIFT</label><input type="text" value={bic} onChange={e=>{setBic(e.target.value.toUpperCase());setSavedProfile(false)}} placeholder="XXXXXXXX" autoCapitalize="characters" autoComplete="off" className={inputClass}/></div>
       </div>
       {profileError&&<div className="rounded-xl bg-red-50 border border-red-100 px-3 py-2 text-sm text-red-700">{profileError}</div>}
       <div className="flex items-center gap-3"><button onClick={saveProfile} disabled={savingProfile||loadingProfile} className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-60">{savingProfile?'Enregistrement…':'Enregistrer'}</button>{savedProfile&&<span className="text-sm text-green-600 font-medium">✓ Sauvegardé</span>}</div>
