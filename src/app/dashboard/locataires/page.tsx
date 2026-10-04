@@ -8,7 +8,8 @@ type Bail = { id:string; bien_id:string; lot_id:string|null; type_occupation:str
 type Lot = { id:string; bien_id:string; numero_lot:string|null; nom_personnalise:string|null; type:string|null; specificite:string|null }
 type Affectation = { bail_id:string; lot_id:string; date_fin:string|null }
 type GroupeOccupation = { key:string; bail:Bail|null; occupants:Locataire[] }
-const lotLabel=(lot:Lot|undefined)=>lot?(lot.nom_personnalise?.trim()||(lot.numero_lot?`Lot ${lot.numero_lot}`:null)||lot.specificite||lot.type||null):null
+const formatLotType=(value:string|null|undefined)=>{if(!value)return null;return value.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}
+const lotLabel=(lot:Lot|undefined)=>{if(!lot)return null;const type=formatLotType(lot.type);const personnalise=lot.nom_personnalise?.trim();if(type&&personnalise)return `${type} — ${personnalise}`;return type||personnalise||(lot.numero_lot?`Lot ${lot.numero_lot}`:null)||lot.specificite||null}
 
 export default async function LocatairesPage() {
   const supabase = await createClient()
@@ -68,11 +69,7 @@ export default async function LocatairesPage() {
       <div key={groupe.key} className="relative bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
         <Link href={ficheHref} className="absolute inset-0 rounded-2xl" aria-label={`Consulter ${titre}`} />
         <div className="flex items-start justify-between gap-3 mb-3 pointer-events-none">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap"><h3 className="font-semibold text-slate-900 text-base">{titre}</h3>{termine && <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">Bail terminé</span>}</div>
-            <p className="text-xs font-medium text-blue-600 mt-0.5">{badgeOccupation}</p>
-            {estGroupe ? <p className="text-xs text-slate-400 mt-1">Locataire principal : {principal.nom}</p> : <p className="text-xs text-slate-400">{principal.email}</p>}
-          </div>
+          <div className="min-w-0"><div className="flex items-center gap-2 flex-wrap"><h3 className="font-semibold text-slate-900 text-base">{titre}</h3>{termine && <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">Bail terminé</span>}</div><p className="text-xs font-medium text-blue-600 mt-0.5">{badgeOccupation}</p>{estGroupe ? <p className="text-xs text-slate-400 mt-1">Locataire principal : {principal.nom}</p> : <p className="text-xs text-slate-400">{principal.email}</p>}</div>
           {!termine && <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full flex-shrink-0 ${cautionPayee ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{cautionPayee ? 'Caution reçue' : 'Caution en attente'}</span>}
         </div>
         {bien && <p className="text-sm text-slate-500 mb-1 pointer-events-none">⌂ {bien.nom} — {bien.ville}</p>}
