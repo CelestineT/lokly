@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import { PDFDocument, rgb, StandardFonts, PDFFont } from 'pdf-lib'
 
 const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
 
@@ -17,14 +17,64 @@ function formatDateSignature(date: Date): string {
   return `${j} ${m} ${y}`
 }
 
+function cleanPdfText(value: string): string {
+  return String(value ?? '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, ' ')
+    .replace(/[’‘]/g, "'")
+    .replace(/[–—]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function eur(n: number): string {
+  const sign = n < 0 ? '-' : ''
+  const value = Math.abs(Number(n || 0)).toFixed(2).replace('.', ',')
+  const [integer, decimals] = value.split(',')
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return `${sign}${grouped},${decimals} EUR`
+}
+
+function drawWrappedText(
+  page: any,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  font: PDFFont,
+  size: number,
+  color: any,
+  lineHeight = size + 3,
+): number {
+  const words = cleanPdfText(text).split(' ')
+  let line = ''
+  const lines: string[] = []
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word
+    if (font.widthOfTextAtSize(test, size) > maxWidth && line) {
+      lines.push(line)
+      line = word
+    } else {
+      line = test
+    }
+  }
+  if (line) lines.push(line)
+  for (const item of lines) {
+    page.drawText(item, { x, y, size, font, color })
+    y -= lineHeight
+  }
+  return y
+}
+
 async function generateQuittancePdf(params: {
   locataireNom: string
   locataireEmail: string
   proprietaireNom: string
+  proprietaireEmail: string
   bienAdresse: string
   bienVille: string
   bienNom: string
   mois: string
+  reference: string
   loyerHc: number
   charges: number
   solde: number
@@ -33,201 +83,196 @@ async function generateQuittancePdf(params: {
   dateSignature: string
 }): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create()
-  const page = pdfDoc.addPage([595, 842]) // A4
+  const page = pdfDoc.addPage([595, 842])
   const { width, height } = page.getSize()
 
-  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica)
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+  const regular = await pdfDoc.embedFont(StandardFonts.Helvetica)
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-  const gris = rgb(0.4, 0.45, 0.5)
-  const noir = rgb(0.07, 0.1, 0.15)
-  const bleu = rgb(0.13, 0.41, 0.9)
+  // Palette Ekolocs
+  const navy = rgb(0.035, 0.075, 0.16)
+  const blue = rgb(0.11, 0.22, 0.86)
+  const blueSoft = rgb(0.94, 0.96, 1)
+  const blueLine = rgb(0.77, 0.82, 1)
+  const slate = rgb(0.34, 0.41, 0.52)
+  const lightText = rgb(0.47, 0.55, 0.67)
+  const border = rgb(0.86, 0.89, 0.93)
+  const soft = rgb(0.975, 0.98, 0.99)
+  const white = rgb(1, 1, 1)
 
-  // En-tête
+  const margin = 42
+  const contentWidth = width - margin * 2
+
+  // ===== EN-TETE EKOLOCS =====
+  page.drawText('EKOLOCS', { x: margin, y: height - 54, size: 21, font: bold, color: blue })
+  page.drawText('Gestion locative', { x: margin, y: height - 70, size: 8.5, font: regular, color: lightText })
+
   page.drawText('QUITTANCE DE LOYER', {
-    x: 50, y: height - 60,
-    size: 18, font: fontBold, color: noir,
+    x: 210, y: height - 55, size: 17, font: bold, color: navy,
   })
   page.drawText(formatMois(params.mois), {
-    x: 50, y: height - 84,
-    size: 12, font: fontRegular, color: gris,
+    x: 210, y: height - 74, size: 10.5, font: regular, color: slate,
   })
 
-  // Ligne de séparation
+  const refLabel = `Reference : ${params.reference}`
+  const refWidth = regular.widthOfTextAtSize(refLabel, 8)
+  page.drawText(refLabel, {
+    x: width - margin - refWidth,
+    y: height - 72,
+    size: 8,
+    font: regular,
+    color: lightText,
+  })
+
   page.drawLine({
-    start: { x: 50, y: height - 100 },
-    end: { x: width - 50, y: height - 100 },
-    thickness: 1, color: rgb(0.85, 0.88, 0.92),
+    start: { x: margin, y: height - 92 },
+    end: { x: width - margin, y: height - 92 },
+    thickness: 1.5,
+    color: blue,
   })
 
-  let y = height - 130
+  // ===== BAILLEUR / LOCATAIRE =====
+  const cardsY = height - 112
+  const cardH = 92
+  const gap = 12
+  const cardW = (contentWidth - gap) / 2
 
-  // Bailleur
-  page.drawText('BAILLEUR', { x: 50, y, size: 8, font: fontBold, color: bleu })
-  y -= 18
-  page.drawText(params.proprietaireNom, { x: 50, y, size: 11, font: fontBold, color: noir })
-  y -= 30
+  page.drawRectangle({ x: margin, y: cardsY - cardH, width: cardW, height: cardH, color: soft, borderColor: border, borderWidth: 0.8 })
+  page.drawRectangle({ x: margin + cardW + gap, y: cardsY - cardH, width: cardW, height: cardH, color: soft, borderColor: border, borderWidth: 0.8 })
 
-  // Locataire
-  page.drawText('LOCATAIRE', { x: 50, y, size: 8, font: fontBold, color: bleu })
-  y -= 18
-  page.drawText(params.locataireNom, { x: 50, y, size: 11, font: fontBold, color: noir })
-  y -= 18
-  page.drawText(params.locataireEmail, { x: 50, y, size: 10, font: fontRegular, color: gris })
-  y -= 30
-
-  // Bien loué
-  page.drawText('BIEN LOUE', { x: 50, y, size: 8, font: fontBold, color: bleu })
-  y -= 18
-  page.drawText(params.bienNom, { x: 50, y, size: 11, font: fontBold, color: noir })
-  y -= 18
-  page.drawText(`${params.bienAdresse}, ${params.bienVille}`, { x: 50, y, size: 10, font: fontRegular, color: gris })
-  y -= 40
-
-  // Séparateur
-  page.drawLine({
-    start: { x: 50, y }, end: { x: width - 50, y },
-    thickness: 1, color: rgb(0.85, 0.88, 0.92),
-  })
-  y -= 30
-
-  // Helper montants : séparateur espace ASCII 0x20 uniquement
-  const eur = (n: number) => {
-    const abs = Math.abs(n)
-    const str = abs.toFixed(0)
-    let formatted = ''
-    for (let i = 0; i < str.length; i++) {
-      if (i > 0 && (str.length - i) % 3 === 0) formatted += '\x20'
-      formatted += str[i]
-    }
-    return (n < 0 ? '-' : '') + formatted + '\x20EUR'
+  page.drawText('INFORMATIONS DU BAILLEUR', { x: margin + 14, y: cardsY - 20, size: 8, font: bold, color: blue })
+  page.drawText(params.proprietaireNom || '-', { x: margin + 14, y: cardsY - 42, size: 11, font: bold, color: navy })
+  if (params.proprietaireEmail) {
+    page.drawText(params.proprietaireEmail, { x: margin + 14, y: cardsY - 60, size: 8.5, font: regular, color: slate })
   }
 
-  // Détail financier
-  page.drawText('DETAIL DU REGLEMENT', { x: 50, y, size: 8, font: fontBold, color: bleu })
-  y -= 20
+  const rightX = margin + cardW + gap
+  page.drawText('INFORMATIONS DU LOCATAIRE', { x: rightX + 14, y: cardsY - 20, size: 8, font: bold, color: blue })
+  page.drawText(params.locataireNom || '-', { x: rightX + 14, y: cardsY - 42, size: 11, font: bold, color: navy })
+  if (params.locataireEmail) {
+    page.drawText(params.locataireEmail, { x: rightX + 14, y: cardsY - 60, size: 8.5, font: regular, color: slate })
+  }
 
-  // Loyer HC
-  page.drawText('Loyer hors charges', { x: 50, y, size: 10, font: fontRegular, color: gris })
-  page.drawText(eur(params.loyerHc), { x: width - 50 - 80, y, size: 10, font: fontRegular, color: noir })
-  y -= 18
+  // ===== BIEN / LOT =====
+  let y = cardsY - cardH - 18
+  page.drawRectangle({ x: margin, y: y - 64, width: contentWidth, height: 64, color: blueSoft, borderColor: blueLine, borderWidth: 0.8 })
+  page.drawText('BIEN LOUE', { x: margin + 14, y: y - 18, size: 8, font: bold, color: blue })
+  page.drawText(params.bienNom || 'Bien loue', { x: margin + 14, y: y - 38, size: 11, font: bold, color: navy })
+  page.drawText(cleanPdfText(`${params.bienAdresse}${params.bienVille ? ` - ${params.bienVille}` : ''}`), {
+    x: margin + 14, y: y - 54, size: 8.5, font: regular, color: slate,
+  })
 
-  // Charges
-  page.drawText('Charges', { x: 50, y, size: 10, font: fontRegular, color: gris })
-  page.drawText(eur(params.charges), { x: width - 50 - 80, y, size: 10, font: fontRegular, color: noir })
-  y -= 18
+  // ===== TABLEAU DU REGLEMENT =====
+  y -= 84
+  page.drawText('DETAIL DU REGLEMENT', { x: margin, y, size: 9, font: bold, color: navy })
+  y -= 16
 
-  // Solde si non nul
-  if (params.solde !== 0) {
-    page.drawText('Solde', { x: 50, y, size: 10, font: fontRegular, color: gris })
-    const soldeColor = params.solde < 0 ? rgb(0.8, 0.15, 0.15) : rgb(0.1, 0.65, 0.35)
-    page.drawText(`${params.solde > 0 ? '+' : ''}${eur(params.solde)}`, {
-      x: width - 50 - 80, y, size: 10, font: fontRegular, color: soldeColor,
+  const tableX = margin
+  const tableW = contentWidth
+  const amountW = 125
+  const labelW = tableW - amountW
+  const rowH = 27
+
+  page.drawRectangle({ x: tableX, y: y - rowH, width: tableW, height: rowH, color: navy })
+  page.drawText('LIBELLE', { x: tableX + 12, y: y - 18, size: 8, font: bold, color: white })
+  page.drawText('MONTANT', { x: tableX + labelW + 12, y: y - 18, size: 8, font: bold, color: white })
+  y -= rowH
+
+  const rows: Array<{ label: string; value: number; muted?: boolean }> = [
+    { label: 'Loyer hors charges', value: params.loyerHc },
+    { label: 'Charges', value: params.charges },
+  ]
+  if (params.solde !== 0) rows.push({ label: 'Solde anterieur', value: params.solde })
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    page.drawRectangle({
+      x: tableX,
+      y: y - rowH,
+      width: tableW,
+      height: rowH,
+      color: i % 2 === 0 ? white : soft,
+      borderColor: border,
+      borderWidth: 0.5,
     })
-    y -= 18
+    page.drawLine({
+      start: { x: tableX + labelW, y },
+      end: { x: tableX + labelW, y: y - rowH },
+      thickness: 0.5,
+      color: border,
+    })
+    page.drawText(row.label, { x: tableX + 12, y: y - 18, size: 9, font: regular, color: slate })
+    const value = eur(row.value)
+    const valueW = regular.widthOfTextAtSize(value, 9)
+    page.drawText(value, { x: tableX + tableW - 12 - valueW, y: y - 18, size: 9, font: regular, color: navy })
+    y -= rowH
   }
 
-  // Ligne total
-  page.drawLine({
-    start: { x: 50, y }, end: { x: width - 50, y },
-    thickness: 1, color: rgb(0.85, 0.88, 0.92),
-  })
-  y -= 18
-  page.drawText('TOTAL RECU', { x: 50, y, size: 11, font: fontBold, color: noir })
-  page.drawText(eur(params.total), { x: width - 50 - 80, y, size: 11, font: fontBold, color: noir })
-  y -= 40
-
-  // Texte légal
-  const legal = `Je soussigne(e), ${params.proprietaireNom}, proprietaire du logement designe ci-dessus, declare avoir recu de ${params.locataireNom} la somme de ${eur(params.total)} au titre du loyer et des charges du mois de ${formatMois(params.mois)}, et lui en donne quittance, sous reserve de tous mes droits.`
-
-  // Wrap text
-  const maxWidth = width - 100
-  const words = legal.split(' ')
-  let line = ''
-  const lines: string[] = []
-  for (const word of words) {
-    const test = line ? `${line} ${word}` : word
-    const w = fontRegular.widthOfTextAtSize(test, 10)
-    if (w > maxWidth) { lines.push(line); line = word }
-    else line = test
+  // Lignes prévues pour les futures données fonctionnelles
+  const placeholders = ['Lot annexe / complement', 'Regularisation des charges']
+  for (const label of placeholders) {
+    page.drawRectangle({ x: tableX, y: y - 22, width: tableW, height: 22, color: white, borderColor: border, borderWidth: 0.5 })
+    page.drawLine({ start: { x: tableX + labelW, y }, end: { x: tableX + labelW, y: y - 22 }, thickness: 0.5, color: border })
+    page.drawText(label, { x: tableX + 12, y: y - 15, size: 7.5, font: regular, color: lightText })
+    page.drawText('-', { x: tableX + tableW - 18, y: y - 15, size: 8, font: regular, color: lightText })
+    y -= 22
   }
-  if (line) lines.push(line)
 
-  for (const l of lines) {
-    page.drawText(l, { x: 50, y, size: 10, font: fontRegular, color: gris })
-    y -= 16
-  }
-  y -= 24
+  page.drawRectangle({ x: tableX, y: y - 34, width: tableW, height: 34, color: blueSoft, borderColor: blueLine, borderWidth: 0.8 })
+  page.drawText('TOTAL RECU', { x: tableX + 12, y: y - 22, size: 10, font: bold, color: navy })
+  const totalText = eur(params.total)
+  const totalW = bold.widthOfTextAtSize(totalText, 11)
+  page.drawText(totalText, { x: tableX + tableW - 12 - totalW, y: y - 22, size: 11, font: bold, color: blue })
+  y -= 52
 
-  // Date et signature
-  page.drawText(`Fait le ${params.dateSignature}`, {
-    x: 50, y, size: 10, font: fontRegular, color: gris,
-  })
-  y -= 24
+  // ===== INFORMATIONS COMPLEMENTAIRES =====
+  page.drawText('INFORMATIONS COMPLEMENTAIRES', { x: margin, y, size: 8, font: bold, color: blue })
+  y -= 14
+  page.drawRectangle({ x: margin, y: y - 46, width: contentWidth, height: 46, color: soft, borderColor: border, borderWidth: 0.6 })
+  page.drawText('Mode de paiement', { x: margin + 12, y: y - 17, size: 7.5, font: bold, color: lightText })
+  page.drawText('A renseigner', { x: margin + 12, y: y - 34, size: 8.5, font: regular, color: slate })
+  page.drawText('Commentaire', { x: margin + 190, y: y - 17, size: 7.5, font: bold, color: lightText })
+  page.drawText('Aucun commentaire', { x: margin + 190, y: y - 34, size: 8.5, font: regular, color: slate })
+  y -= 64
 
-  page.drawText('Signature du bailleur :', { x: 50, y, size: 10, font: fontBold, color: noir })
-  y -= 10
+  // ===== TEXTE DE QUITTANCE =====
+  const legal = `Je soussigne(e), ${params.proprietaireNom}, bailleur du logement designe ci-dessus, declare avoir recu de ${params.locataireNom} la somme de ${eur(params.total)} au titre du loyer et des charges du mois de ${formatMois(params.mois)}, et lui en donne quittance, sous reserve de tous mes droits.`
+  y = drawWrappedText(page, legal, margin, y, contentWidth, regular, 8.2, slate, 11)
+  y -= 13
 
-  // Embed signature image (depuis profiles.signature_base64)
+  // ===== COORDONNEES BANCAIRES / SIGNATURE =====
+  const bottomCardH = 78
+  const bottomW = (contentWidth - gap) / 2
+  page.drawRectangle({ x: margin, y: y - bottomCardH, width: bottomW, height: bottomCardH, color: soft, borderColor: border, borderWidth: 0.6 })
+  page.drawText('COORDONNEES BANCAIRES', { x: margin + 12, y: y - 17, size: 7.5, font: bold, color: blue })
+  page.drawText('IBAN : a renseigner dans les parametres', { x: margin + 12, y: y - 37, size: 7.5, font: regular, color: slate })
+  page.drawText('BIC : a renseigner dans les parametres', { x: margin + 12, y: y - 53, size: 7.5, font: regular, color: slate })
+
+  const sigX = margin + bottomW + gap
+  page.drawRectangle({ x: sigX, y: y - bottomCardH, width: bottomW, height: bottomCardH, color: white, borderColor: border, borderWidth: 0.6 })
+  page.drawText(`Fait le ${params.dateSignature}`, { x: sigX + 12, y: y - 17, size: 7.5, font: regular, color: slate })
+  page.drawText('Signature du bailleur', { x: sigX + 12, y: y - 33, size: 7.5, font: bold, color: navy })
+
   if (params.signatureDataUrl && params.signatureDataUrl.includes('base64,')) {
     try {
       const base64 = params.signatureDataUrl.split('base64,')[1]
-      if (base64 && base64.length > 100) {
-        const sigBytes = Buffer.from(base64, 'base64')
-        let embedded = false
-        try {
-          const sigImage = await pdfDoc.embedPng(sigBytes)
-          const sigDims = sigImage.scaleToFit(220, 90)
-          page.drawRectangle({
-            x: 50, y: y - sigDims.height,
-            width: sigDims.width, height: sigDims.height,
-            color: rgb(1, 1, 1),
-          })
-          page.drawImage(sigImage, {
-            x: 50,
-            y: y - sigDims.height,
-            width: sigDims.width,
-            height: sigDims.height,
-          })
-          embedded = true
-        } catch {
-          // Si PNG échoue, on tente JPEG
-          try {
-            const sigBytes2 = Buffer.from(base64, 'base64')
-            const sigImage = await pdfDoc.embedJpg(sigBytes2)
-            const sigDims = sigImage.scaleToFit(220, 90)
-            page.drawRectangle({
-              x: 50, y: y - sigDims.height,
-              width: sigDims.width, height: sigDims.height,
-              color: rgb(1, 1, 1),
-            })
-            page.drawImage(sigImage, {
-              x: 50,
-              y: y - sigDims.height,
-              width: sigDims.width,
-              height: sigDims.height,
-            })
-            embedded = true
-          } catch {
-            console.error('embedJpg also failed')
-          }
-        }
-        if (!embedded) {
-          page.drawRectangle({ x: 50, y: y - 80, width: 220, height: 80, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 1 })
-          page.drawText('(signature non disponible)', { x: 60, y: y - 44, size: 9, font: fontRegular, color: gris })
-        }
-      } else {
-        page.drawRectangle({ x: 50, y: y - 80, width: 220, height: 80, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 1 })
-      }
-    } catch (e) {
-      console.error('Erreur embed signature:', e)
-      page.drawRectangle({ x: 50, y: y - 80, width: 220, height: 80, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 1 })
+      const bytes = Buffer.from(base64, 'base64')
+      let image
+      try { image = await pdfDoc.embedPng(bytes) } catch { image = await pdfDoc.embedJpg(bytes) }
+      const dims = image.scaleToFit(bottomW - 30, 34)
+      page.drawImage(image, { x: sigX + 12, y: y - 70, width: dims.width, height: dims.height })
+    } catch (error) {
+      console.error('Erreur signature PDF:', error)
     }
-  } else {
-    // Pas de signature enregistrée : rectangle vide
-    page.drawRectangle({ x: 50, y: y - 80, width: 220, height: 80, borderColor: rgb(0.85, 0.88, 0.92), borderWidth: 1 })
-    page.drawText('Aucune signature enregistree', { x: 60, y: y - 44, size: 9, font: fontRegular, color: gris })
   }
+
+  // Pied de page
+  page.drawText('Ekolocs - Quittance generee automatiquement', {
+    x: margin, y: 24, size: 6.8, font: regular, color: lightText,
+  })
+  const footerRef = params.reference
+  const footerW = regular.widthOfTextAtSize(footerRef, 6.8)
+  page.drawText(footerRef, { x: width - margin - footerW, y: 24, size: 6.8, font: regular, color: lightText })
 
   return pdfDoc.save()
 }
@@ -240,32 +285,16 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = await createClient()
-
-    // Auth
     const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
-    }
+    if (authError || !user) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
 
-    // Vérifier l'OTP
     const { data: otpRow, error: otpErr } = await supabase
-      .from('otp_codes')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('quittance_id', quittanceId)
-      .single()
+      .from('otp_codes').select('*').eq('user_id', user.id).eq('quittance_id', quittanceId).single()
 
-    if (otpErr || !otpRow) {
-      return NextResponse.json({ error: 'Code invalide ou expiré' }, { status: 400 })
-    }
-    if (otpRow.code !== otp) {
-      return NextResponse.json({ error: 'Code incorrect' }, { status: 400 })
-    }
-    if (new Date(otpRow.expires_at) < new Date()) {
-      return NextResponse.json({ error: 'Code expiré' }, { status: 400 })
-    }
+    if (otpErr || !otpRow) return NextResponse.json({ error: 'Code invalide ou expiré' }, { status: 400 })
+    if (otpRow.code !== otp) return NextResponse.json({ error: 'Code incorrect' }, { status: 400 })
+    if (new Date(otpRow.expires_at) < new Date()) return NextResponse.json({ error: 'Code expiré' }, { status: 400 })
 
-    // Récupérer la quittance avec locataire et bien
     const { data: quittance, error: qErr } = await supabase
       .from('quittances')
       .select('*, locataires(nom, email), biens(nom, adresse, ville)')
@@ -273,11 +302,8 @@ export async function POST(req: NextRequest) {
       .eq('proprietaire_id', user.id)
       .single()
 
-    if (qErr || !quittance) {
-      return NextResponse.json({ error: 'Quittance introuvable' }, { status: 404 })
-    }
+    if (qErr || !quittance) return NextResponse.json({ error: 'Quittance introuvable' }, { status: 404 })
 
-    // Récupérer le profil du propriétaire (nom + signature)
     const { data: profile } = await supabase
       .from('profiles')
       .select('nom, prenom, signature_base64')
@@ -288,43 +314,34 @@ export async function POST(req: NextRequest) {
       ? `${profile.prenom ?? ''} ${profile.nom ?? ''}`.trim() || user.email!
       : user.email!
 
-    // Signature depuis la base (priorité) — plus besoin de l'envoyer depuis le front
     const signatureDataUrl = profile?.signature_base64 ?? ''
-
     const dateSignature = formatDateSignature(new Date())
+    const reference = `EKO-${String(quittance.mois ?? '').replace('-', '')}-${String(quittance.id).slice(0, 6).toUpperCase()}`
 
-    // Nettoyer les caractères non-WinAnsi
-    function clean(s: string): string {
-      return s.replace(/[     ​‌‍﻿]/g, ' ').trim()
-    }
-
-    // Générer le PDF
     const pdfBytes = await generateQuittancePdf({
-      locataireNom: clean(quittance.locataires?.nom ?? '-'),
-      locataireEmail: clean(quittance.locataires?.email ?? ''),
-      proprietaireNom: clean(proprietaireNom),
-      bienNom: clean(quittance.biens?.nom ?? ''),
-      bienAdresse: clean(quittance.biens?.adresse ?? ''),
-      bienVille: clean(quittance.biens?.ville ?? ''),
+      locataireNom: cleanPdfText(quittance.locataires?.nom ?? '-'),
+      locataireEmail: cleanPdfText(quittance.locataires?.email ?? ''),
+      proprietaireNom: cleanPdfText(proprietaireNom),
+      proprietaireEmail: cleanPdfText(user.email ?? ''),
+      bienNom: cleanPdfText(quittance.biens?.nom ?? ''),
+      bienAdresse: cleanPdfText(quittance.biens?.adresse ?? ''),
+      bienVille: cleanPdfText(quittance.biens?.ville ?? ''),
       mois: quittance.mois,
-      loyerHc: quittance.loyer_hc,
-      charges: quittance.charges,
-      solde: quittance.solde,
-      total: quittance.total,
+      reference,
+      loyerHc: Number(quittance.loyer_hc ?? 0),
+      charges: Number(quittance.charges ?? 0),
+      solde: Number(quittance.solde ?? 0),
+      total: Number(quittance.total ?? 0),
       signatureDataUrl,
       dateSignature,
     })
 
     const pdfBase64 = Buffer.from(pdfBytes).toString('base64')
     const fileName = `quittance-${quittance.mois}-${quittance.locataires?.nom?.toLowerCase().replace(/\s+/g, '-') ?? 'locataire'}.pdf`
-
-    // Envoyer par email au locataire via Resend
     const locataireEmail = quittance.locataires?.email
-    if (!locataireEmail) {
-      return NextResponse.json({ error: 'Email locataire introuvable' }, { status: 400 })
-    }
+    if (!locataireEmail) return NextResponse.json({ error: 'Email locataire introuvable' }, { status: 400 })
 
-    // Mode test : envoi forcé vers synteyapartners@gmail.com
+    // Mode test Resend : envoi vers l'adresse autorisee du compte.
     const emailDest = 'synteyapartners@gmail.com'
     console.log(`[MODE TEST] Envoi PDF vers ${emailDest} (locataire réel : ${locataireEmail})`)
 
@@ -335,23 +352,10 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Lokly <onboarding@resend.dev>',
+        from: 'Ekolocs <onboarding@resend.dev>',
         to: [emailDest],
-        subject: `[TEST] Quittance de loyer — ${formatMois(quittance.mois)}`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-            <p style="color: #ef4444; font-size: 12px; margin-bottom: 16px;">[MODE TEST — en production sera envoyé à : ${locataireEmail}]</p>
-            <h2 style="color: #1e293b; margin-bottom: 8px;">Quittance de loyer</h2>
-            <p style="color: #64748b; margin-bottom: 24px;">
-              Bonjour ${quittance.locataires?.nom ?? ''},<br/>
-              Veuillez trouver ci-joint votre quittance de loyer pour <strong>${formatMois(quittance.mois)}</strong>.
-            </p>
-            <div style="background: #f1f5f9; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-              <p style="margin: 0; color: #1e293b; font-weight: 600;">Montant total : ${quittance.total} EUR</p>
-              <p style="margin: 4px 0 0; color: #64748b; font-size: 13px;">${quittance.biens?.nom ?? ''} — ${quittance.biens?.ville ?? ''}</p>
-            </div>
-          </div>
-        `,
+        subject: `[TEST] Quittance de loyer - ${formatMois(quittance.mois)}`,
+        html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px"><p style="color:#ef4444;font-size:12px">[MODE TEST - en production sera envoye a : ${locataireEmail}]</p><h2>Quittance de loyer</h2><p>Bonjour ${quittance.locataires?.nom ?? ''},<br/>Veuillez trouver ci-joint votre quittance pour <strong>${formatMois(quittance.mois)}</strong>.</p><div style="background:#f1f5f9;border-radius:12px;padding:16px"><strong>Montant total : ${quittance.total} EUR</strong><br/><span style="color:#64748b">${quittance.biens?.nom ?? ''} - ${quittance.biens?.ville ?? ''}</span></div></div>`,
         attachments: [{ filename: fileName, content: pdfBase64 }],
       }),
     })
@@ -361,16 +365,7 @@ export async function POST(req: NextRequest) {
       console.error('Resend error:', resendError)
     }
 
-    // Mettre à jour la quittance comme envoyée
-    await supabase
-      .from('quittances')
-      .update({
-        envoyee: true,
-        date_signature: new Date().toISOString(),
-      })
-      .eq('id', quittanceId)
-
-    // Supprimer l'OTP utilisé
+    await supabase.from('quittances').update({ envoyee: true, date_signature: new Date().toISOString() }).eq('id', quittanceId)
     await supabase.from('otp_codes').delete().eq('quittance_id', quittanceId)
 
     return NextResponse.json({ ok: true })
