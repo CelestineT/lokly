@@ -1,123 +1,21 @@
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import { PDFDocument, rgb, StandardFonts, PDFFont } from 'pdf-lib'
 
-interface QuittanceData {
-  locataireNom: string
-  locataireEmail: string
-  bienAdresse: string
-  mois: string
-  loyerHc: number
-  charges: number
-  solde: number
-  total: number
-  proprietaireNom: string
-  dateSignature: string
-}
+export const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
+export function formatMois(mois:string){const[y,m]=mois.split('-');const label=MOIS_FR[Number(m)-1];return label?`${label.charAt(0).toUpperCase()}${label.slice(1)} ${y}`:mois}
+export function cleanPdfText(value:string){return String(value??'').replace(/[\u200B-\u200D\uFEFF]/g,' ').replace(/[’‘]/g,"'").replace(/[–—]/g,'-').replace(/\s+/g,' ').trim()}
+function eur(n:number){const value=Math.abs(Number(n||0)).toFixed(2).replace('.',',');const[a,b]=value.split(',');return `${n<0?'-':''}${a.replace(/\B(?=(\d{3})+(?!\d))/g,' ')},${b} EUR`}
+function wrap(page:any,text:string,x:number,y:number,max:number,font:PDFFont,size:number,color:any,lineHeight=size+3){let line='';const lines:string[]=[];for(const word of cleanPdfText(text).split(' ')){const test=line?`${line} ${word}`:word;if(line&&font.widthOfTextAtSize(test,size)>max){lines.push(line);line=word}else line=test}if(line)lines.push(line);for(const item of lines){page.drawText(item,{x,y,size,font,color});y-=lineHeight}return y}
 
-export async function generateQuittancePdf(data: QuittanceData): Promise<Uint8Array> {
-  const pdfDoc = await PDFDocument.create()
-  const page = pdfDoc.addPage([595, 842]) // A4
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+export interface QuittancePdfData{locataireNom:string;locataireEmail?:string;proprietaireNom:string;proprietaireEmail?:string;proprietaireTelephone?:string;bienAdresse:string;bienVille:string;bienNom:string;lotNom?:string;typeLogement?:string;specificiteLogement?:string;surface?:number|string;mois:string;reference:string;loyerHc:number;charges:number;solde:number;total:number;fraisAnnexes?:number;regularisationCharges?:number;modePaiement?:string;commentaire?:string;iban?:string;bic?:string;signatureDataUrl?:string;dateSignature:string}
 
-  const { width, height } = page.getSize()
-  const margin = 50
-
-  // Titre
-  page.drawText('QUITTANCE DE LOYER', {
-    x: margin,
-    y: height - 80,
-    size: 20,
-    font: fontBold,
-    color: rgb(0.1, 0.1, 0.5),
-  })
-
-  // Mois
-  page.drawText(`Période : ${data.mois}`, {
-    x: margin,
-    y: height - 110,
-    size: 12,
-    font,
-    color: rgb(0.3, 0.3, 0.3),
-  })
-
-  // Ligne séparatrice
-  page.drawLine({
-    start: { x: margin, y: height - 125 },
-    end: { x: width - margin, y: height - 125 },
-    thickness: 1,
-    color: rgb(0.8, 0.8, 0.8),
-  })
-
-  // Bailleur
-  page.drawText('BAILLEUR', { x: margin, y: height - 155, size: 10, font: fontBold, color: rgb(0.5, 0.5, 0.5) })
-  page.drawText(data.proprietaireNom, { x: margin, y: height - 172, size: 12, font })
-
-  // Locataire
-  page.drawText('LOCATAIRE', { x: margin, y: height - 210, size: 10, font: fontBold, color: rgb(0.5, 0.5, 0.5) })
-  page.drawText(data.locataireNom, { x: margin, y: height - 227, size: 12, font })
-
-  // Bien
-  page.drawText('BIEN LOUÉ', { x: margin, y: height - 265, size: 10, font: fontBold, color: rgb(0.5, 0.5, 0.5) })
-  page.drawText(data.bienAdresse, { x: margin, y: height - 282, size: 12, font })
-
-  // Ligne séparatrice
-  page.drawLine({
-    start: { x: margin, y: height - 310 },
-    end: { x: width - margin, y: height - 310 },
-    thickness: 1,
-    color: rgb(0.8, 0.8, 0.8),
-  })
-
-  // Détail des sommes
-  page.drawText('DÉTAIL DU RÈGLEMENT', { x: margin, y: height - 335, size: 10, font: fontBold, color: rgb(0.5, 0.5, 0.5) })
-
-  page.drawText('Loyer hors charges :', { x: margin, y: height - 360, size: 12, font })
-  page.drawText(`${data.loyerHc.toFixed(2)} €`, { x: width - margin - 80, y: height - 360, size: 12, font })
-
-  page.drawText('Charges :', { x: margin, y: height - 382, size: 12, font })
-  page.drawText(`${data.charges.toFixed(2)} €`, { x: width - margin - 80, y: height - 382, size: 12, font })
-
-  if (data.solde !== 0) {
-    page.drawText('Solde :', { x: margin, y: height - 404, size: 12, font })
-    page.drawText(`${data.solde.toFixed(2)} €`, { x: width - margin - 80, y: height - 404, size: 12, font })
-  }
-
-  // Total
-  page.drawLine({
-    start: { x: margin, y: height - 420 },
-    end: { x: width - margin, y: height - 420 },
-    thickness: 1,
-    color: rgb(0.8, 0.8, 0.8),
-  })
-  page.drawText('TOTAL RÉGLÉ :', { x: margin, y: height - 442, size: 13, font: fontBold })
-  page.drawText(`${data.total.toFixed(2)} €`, { x: width - margin - 80, y: height - 442, size: 13, font: fontBold, color: rgb(0.1, 0.1, 0.5) })
-
-  // Texte légal
-  const legal = `Je soussigné(e) ${data.proprietaireNom}, bailleur, déclare avoir reçu de ${data.locataireNom} la somme de ${data.total.toFixed(2)} € au titre du loyer et des charges du logement désigné ci-dessus pour la période de ${data.mois}, et lui en donne quittance.`
-
-  page.drawText('DÉCLARATION', { x: margin, y: height - 490, size: 10, font: fontBold, color: rgb(0.5, 0.5, 0.5) })
-  
-  // Texte sur plusieurs lignes
-  const words = legal.split(' ')
-  let line = ''
-  let y = height - 510
-  for (const word of words) {
-    const test = line + word + ' '
-    if (font.widthOfTextAtSize(test, 11) > width - margin * 2) {
-      page.drawText(line.trim(), { x: margin, y, size: 11, font })
-      y -= 18
-      line = word + ' '
-    } else {
-      line = test
-    }
-  }
-  if (line.trim()) page.drawText(line.trim(), { x: margin, y, size: 11, font })
-
-  // Date et signature
-  page.drawText(`Fait le ${data.dateSignature}`, { x: margin, y: 120, size: 11, font })
-  page.drawText('Signature du bailleur :', { x: margin, y: 90, size: 11, font })
-  page.drawText(data.proprietaireNom, { x: margin, y: 65, size: 12, font: fontBold })
-
-  const pdfBytes = await pdfDoc.save()
-  return pdfBytes
+export async function generateQuittancePdf(p:QuittancePdfData):Promise<Uint8Array>{
+ const pdf=await PDFDocument.create(),page=pdf.addPage([595,842]);const{width,height}=page.getSize();const regular=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold)
+ const navy=rgb(.035,.075,.16),blue=rgb(.11,.22,.86),slate=rgb(.34,.41,.52),light=rgb(.47,.55,.67),border=rgb(.82,.86,.92),soft=rgb(.975,.98,.99),blueSoft=rgb(.96,.97,1),white=rgb(1,1,1);const margin=42,cw=width-margin*2,gap=10
+ page.drawText('EKOLOCS',{x:margin,y:height-48,size:20,font:bold,color:blue});page.drawText('Gestion locative',{x:margin,y:height-63,size:8,font:regular,color:light})
+ const title='QUITTANCE DE LOYER',ts=16;page.drawText(title,{x:width-margin-bold.widthOfTextAtSize(title,ts),y:height-48,size:ts,font:bold,color:navy});const period=formatMois(p.mois);page.drawText(period,{x:width-margin-regular.widthOfTextAtSize(period,9.5),y:height-64,size:9.5,font:regular,color:slate});const ref=`N° quittance : ${p.reference}`;page.drawText(ref,{x:width-margin-regular.widthOfTextAtSize(ref,7.5),y:height-76,size:7.5,font:regular,color:light});page.drawLine({start:{x:margin,y:height-88},end:{x:width-margin,y:height-88},thickness:1.2,color:blue})
+ const iy=height-106,ih=78,iw=(cw-gap)/2;page.drawRectangle({x:margin,y:iy-ih,width:iw,height:ih,color:white,borderColor:border,borderWidth:.7});page.drawRectangle({x:margin+iw+gap,y:iy-ih,width:iw,height:ih,color:white,borderColor:border,borderWidth:.7});page.drawText('INFORMATIONS DU BAILLEUR',{x:margin+12,y:iy-17,size:7.5,font:bold,color:blue});page.drawText(p.proprietaireNom||'-',{x:margin+12,y:iy-35,size:10,font:bold,color:navy});if(p.proprietaireTelephone)page.drawText(p.proprietaireTelephone,{x:margin+12,y:iy-50,size:8,font:regular,color:slate});if(p.proprietaireEmail)page.drawText(p.proprietaireEmail,{x:margin+12,y:iy-64,size:8,font:regular,color:slate});const lx=margin+iw+gap;page.drawText('INFORMATIONS DU LOCATAIRE',{x:lx+12,y:iy-17,size:7.5,font:bold,color:blue});page.drawText(p.locataireNom||'-',{x:lx+12,y:iy-35,size:10,font:bold,color:navy});if(p.locataireEmail)page.drawText(p.locataireEmail,{x:lx+12,y:iy-52,size:8,font:regular,color:slate})
+ let y=iy-ih-14;const ph=66,pw=(cw-gap*2)/3;const blocks=[{t:'IMMEUBLE',l:[p.bienNom||'-']},{t:'ADRESSE DE LA LOCATION',l:[p.bienAdresse||'-',p.bienVille||'']},{t:'TYPE DE LOGEMENT',l:[p.typeLogement||'À renseigner',p.specificiteLogement||p.lotNom||'',p.surface?`${p.surface} m²`:'']}];blocks.forEach((b,i)=>{const x=margin+i*(pw+gap);page.drawRectangle({x,y:y-ph,width:pw,height:ph,color:blueSoft,borderColor:border,borderWidth:.7});page.drawText(b.t,{x:x+10,y:y-16,size:6.8,font:bold,color:blue});let ly=y-34;b.l.filter(Boolean).slice(0,3).forEach((line,j)=>{page.drawText(cleanPdfText(String(line)),{x:x+10,y:ly,size:j?7.5:8.5,font:j?regular:bold,color:j?slate:navy});ly-=13})})
+ y-=ph+14;const fh=180,mw=150,fx=margin+mw+gap,fw=cw-mw-gap;page.drawRectangle({x:margin,y:y-fh,width:mw,height:fh,color:white,borderColor:border,borderWidth:.7});page.drawText('MESSAGE / INFORMATIONS',{x:margin+10,y:y-17,size:7,font:bold,color:blue});wrap(page,p.commentaire||'Aucune information complémentaire.',margin+10,y-37,mw-20,regular,7.5,slate,10);page.drawText('LIBELLÉ',{x:fx+10,y:y-15,size:7,font:bold,color:navy});page.drawText('MONTANT HT',{x:fx+fw-122,y:y-15,size:6.5,font:bold,color:navy});page.drawText('MONTANT TTC',{x:fx+fw-62,y:y-15,size:6.5,font:bold,color:navy});page.drawRectangle({x:fx,y:y-fh,width:fw,height:fh,borderColor:border,borderWidth:.7});const c1=fx+fw-135,c2=fx+fw-70;page.drawLine({start:{x:c1,y},end:{x:c1,y:y-fh},thickness:.5,color:border});page.drawLine({start:{x:c2,y},end:{x:c2,y:y-fh},thickness:.5,color:border});const rows=[['Loyer',p.loyerHc],['Charges (acompte)',p.charges],[`Solde dû au ${formatMois(p.mois)}`,p.solde||undefined],['Frais annexes',p.fraisAnnexes],['Régularisation des charges',p.regularisationCharges]] as Array<[string,number|undefined]>;let rt=y-25;page.drawLine({start:{x:fx,y:rt},end:{x:fx+fw,y:rt},thickness:.6,color:border});for(const[label,value]of rows){const ly=rt-16;page.drawText(label,{x:fx+10,y:ly,size:7.2,font:regular,color:slate});if(value!==undefined&&Number(value)!==0){const v=eur(Number(value));page.drawText(v,{x:fx+fw-8-regular.widthOfTextAtSize(v,7),y:ly,size:7,font:regular,color:navy})}rt-=25;page.drawLine({start:{x:fx,y:rt},end:{x:fx+fw,y:rt},thickness:.5,color:border})}const ty=y-fh+8;page.drawText('TOTAL ÉCHÉANCE',{x:fx+10,y:ty,size:8.5,font:bold,color:navy});const total=eur(p.total);page.drawText(total,{x:fx+fw-8-bold.widthOfTextAtSize(total,9),y:ty,size:9,font:bold,color:blue})
+ y-=fh+13;page.drawText('MODE DE PAIEMENT',{x:margin,y,size:7,font:bold,color:blue});page.drawText(p.modePaiement||'À renseigner',{x:margin+100,y,size:7.5,font:regular,color:slate});y-=12;const sh=48;page.drawRectangle({x:margin,y:y-sh,width:cw,height:sh,color:white,borderColor:border,borderWidth:.6});page.drawText('CACHET PAYÉ',{x:margin+10,y:y-16,size:7,font:bold,color:light});y-=sh+10;const bh=72,bw=(cw-gap)/2;page.drawRectangle({x:margin,y:y-bh,width:bw,height:bh,color:soft,borderColor:border,borderWidth:.6});page.drawText('COORDONNÉES BANCAIRES',{x:margin+10,y:y-16,size:7,font:bold,color:blue});page.drawText(`BIC : ${p.bic||'à renseigner dans les paramètres'}`,{x:margin+10,y:y-35,size:7,font:regular,color:slate});page.drawText(`IBAN : ${p.iban||'à renseigner dans les paramètres'}`,{x:margin+10,y:y-51,size:7,font:regular,color:slate});const sx=margin+bw+gap;page.drawRectangle({x:sx,y:y-bh,width:bw,height:bh,color:white,borderColor:border,borderWidth:.6});page.drawText(`Fait le ${p.dateSignature}`,{x:sx+10,y:y-16,size:7,font:regular,color:slate});page.drawText('Signature du bailleur',{x:sx+10,y:y-31,size:7,font:bold,color:navy});if(p.signatureDataUrl?.includes('base64,')){try{const bytes=Buffer.from(p.signatureDataUrl.split('base64,')[1],'base64');let image;try{image=await pdf.embedPng(bytes)}catch{image=await pdf.embedJpg(bytes)}const d=image.scaleToFit(bw-30,31);page.drawImage(image,{x:sx+10,y:y-67,width:d.width,height:d.height})}catch{}}
+ page.drawText('Ekolocs - Quittance générée automatiquement',{x:margin,y:22,size:6.5,font:regular,color:light});page.drawText(p.reference,{x:width-margin-regular.widthOfTextAtSize(p.reference,6.5),y:22,size:6.5,font:regular,color:light});return pdf.save()
 }
