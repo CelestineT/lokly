@@ -28,15 +28,13 @@ export async function ajouterLocataire(formData: FormData) {
   const echeance_bail = echeance.toISOString().split('T')[0]
 
   const locatairesJson = formData.get('locataires_json') as string
-  let locataires: { prenom: string; nom: string; email: string; telephone: string }[] = []
+  let locataires: { civilite:string; prenom: string; nom: string; email: string; telephone: string }[] = []
   try { locataires = JSON.parse(locatairesJson) } catch { return { error: 'Données locataires invalides' } }
   const filled = locataires.filter(l => l.prenom.trim() || l.nom.trim() || l.email.trim())
   if (!filled.length) return { error: 'Au moins un locataire est requis' }
 
   const occupation = filled.length === 1 ? 'individuel' : type_occupation
-  if (filled.length > 1 && !['bail_commun','colocation'].includes(occupation)) {
-    return { error: 'Précisez s’il s’agit d’un bail commun ou d’une colocation' }
-  }
+  if (filled.length > 1 && !['bail_commun','colocation'].includes(occupation)) return { error: 'Précisez s’il s’agit d’un bail commun ou d’une colocation' }
 
   const { data: bail, error: bailError } = await supabase.from('baux').insert({
     proprietaire_id: user.id, bien_id, lot_id, type_occupation: occupation,
@@ -47,31 +45,17 @@ export async function ajouterLocataire(formData: FormData) {
 
   for (let i = 0; i < filled.length; i++) {
     const loc = filled[i]
+    const prenom=loc.prenom.trim(), nomFamille=loc.nom.trim(), civilite=loc.civilite||null
     const payload: Record<string, unknown> = {
-      proprietaire_id: user.id,
-      bien_id,
-      bail_id: bail.id,
-      est_principal: i === 0,
-      nom: `${loc.prenom.trim()} ${loc.nom.trim()}`.trim(),
-      email: loc.email.trim(),
-      telephone: loc.telephone.trim() || null,
-      date_entree,
-      loyer_hc,
-      charges,
-      caution,
-      caution_payee,
-      duree_bail_ans,
-      echeance_bail,
-      mode_paiement: mode_paiement || null,
-      commentaire: commentaire || null,
-      actif: true,
+      proprietaire_id: user.id, bien_id, bail_id: bail.id, est_principal: i === 0,
+      civilite, prenom, nom_famille:nomFamille,
+      nom: `${civilite?civilite+' ':''}${nomFamille.toUpperCase()} ${prenom}`.trim(),
+      email: loc.email.trim(), telephone: loc.telephone.trim() || null,
+      date_entree, loyer_hc, charges, caution, caution_payee, duree_bail_ans,
+      echeance_bail, mode_paiement: mode_paiement || null, commentaire: commentaire || null, actif: true,
     }
     const { error } = await supabase.from('locataires').insert(payload)
-    if (error) {
-      await supabase.from('baux').delete().eq('id', bail.id)
-      return { error: error.message }
-    }
+    if (error) { await supabase.from('baux').delete().eq('id', bail.id); return { error: error.message } }
   }
-
   redirect('/dashboard/locataires')
 }
