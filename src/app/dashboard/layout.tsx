@@ -1,4 +1,5 @@
 import Sidebar from '@/components/Sidebar'
+import MobileInfoTooltips from '@/components/MobileInfoTooltips'
 
 export default function DashboardLayout({
   children,
@@ -11,6 +12,7 @@ export default function DashboardLayout({
       <main className="flex-1 p-4 md:p-8">
         {children}
       </main>
+      <MobileInfoTooltips />
     </div>
   )
 }
