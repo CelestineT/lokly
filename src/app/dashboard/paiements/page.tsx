@@ -124,9 +124,10 @@ export default function PaiementsPage() {
 
       <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
         {moisDisponibles.slice(0, 3).map((m) => <button key={m} onClick={() => setFiltreMois(m)} className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${filtreMois === m ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{formatMois(m)}</button>)}
-        <label className="flex-shrink-0 relative">
+        <label className="flex-shrink-0 relative w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-500 inline-flex items-center justify-center hover:bg-slate-50 focus-within:ring-2 focus-within:ring-blue-500" title="Choisir un autre mois">
           <span className="sr-only">Choisir un autre mois</span>
-          <input type="month" value={filtreMois} onChange={(e) => setFiltreMois(e.target.value)} className="w-[2.35rem] h-[2rem] rounded-full border border-slate-200 bg-white text-transparent px-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer" title="Choisir un autre mois" />
+          <svg aria-hidden="true" className="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <input type="month" value={filtreMois} onChange={(e) => setFiltreMois(e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
         </label>
         {filtreMois && <button onClick={() => setFiltreMois('')} className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors">Tout voir</button>}
       </div>
