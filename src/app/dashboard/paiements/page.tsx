@@ -123,7 +123,11 @@ export default function PaiementsPage() {
       </div>
 
       <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
-        {moisDisponibles.slice(0, 6).map((m) => <button key={m} onClick={() => setFiltreMois(m)} className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${filtreMois === m ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{formatMois(m)}</button>)}
+        {moisDisponibles.slice(0, 3).map((m) => <button key={m} onClick={() => setFiltreMois(m)} className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${filtreMois === m ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{formatMois(m)}</button>)}
+        <label className="flex-shrink-0 relative">
+          <span className="sr-only">Choisir un autre mois</span>
+          <input type="month" value={filtreMois} onChange={(e) => setFiltreMois(e.target.value)} className="w-[2.35rem] h-[2rem] rounded-full border border-slate-200 bg-white text-transparent px-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer" title="Choisir un autre mois" />
+        </label>
         {filtreMois && <button onClick={() => setFiltreMois('')} className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors">Tout voir</button>}
       </div>
 
