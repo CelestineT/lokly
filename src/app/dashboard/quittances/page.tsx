@@ -31,6 +31,7 @@ export default function QuittancesPage() {
   const [quittances, setQuittances] = useState<Quittance[]>([])
   const [locataires, setLocataires] = useState<Locataire[]>([])
   const [biens, setBiens] = useState<Bien[]>([])
+  const [filtreMois, setFiltreMois] = useState('')
 
   useEffect(() => {
     const supabase = createClient()
@@ -63,6 +64,7 @@ export default function QuittancesPage() {
   }
 
   const sortedMois = Array.from(grouped.keys()).sort((a, b) => b.localeCompare(a))
+  const moisAffiches = filtreMois ? sortedMois.filter((mois) => mois === filtreMois) : sortedMois
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -82,6 +84,24 @@ export default function QuittancesPage() {
         </Link>
       </div>
 
+      {quittances.length > 0 && (
+        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
+          {sortedMois.slice(0, 3).map((mois) => (
+            <button key={mois} type="button" onClick={() => setFiltreMois(mois)}
+              className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${filtreMois === mois ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+              {formatMois(mois)}
+            </button>
+          ))}
+          <label className="flex-shrink-0 relative">
+            <span className="sr-only">Choisir un autre mois</span>
+            <input type="month" value={filtreMois} onChange={(e) => setFiltreMois(e.target.value)}
+              className="w-[2.35rem] h-[2rem] rounded-full border border-slate-200 bg-white text-transparent px-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+              title="Choisir un autre mois" />
+          </label>
+          {filtreMois && <button type="button" onClick={() => setFiltreMois('')} className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors">Tout voir</button>}
+        </div>
+      )}
+
       {quittances.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 flex flex-col items-center text-center">
           <h2 className="text-lg font-semibold text-slate-800 mb-2">Aucune quittance pour le moment</h2>
@@ -93,7 +113,7 @@ export default function QuittancesPage() {
         </div>
       ) : (
         <div className="space-y-10">
-          {sortedMois.map((mois) => {
+          {moisAffiches.map((mois) => {
             const byBien = grouped.get(mois)!
             const sortedBienIds = Array.from(byBien.keys()).sort((a, b) => {
               const ba = biensMap.get(a)
@@ -158,6 +178,11 @@ export default function QuittancesPage() {
               </section>
             )
           })}
+          {moisAffiches.length === 0 && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-10 text-center">
+              <p className="text-slate-500 text-sm">Aucune quittance pour ce mois.</p>
+            </div>
+          )}
         </div>
       )}
     </div>
