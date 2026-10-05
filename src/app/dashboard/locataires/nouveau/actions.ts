@@ -23,6 +23,18 @@ export async function ajouterLocataire(formData: FormData) {
 
   if (!bien_id || !date_entree) return { error: 'Le bien et la date d’entrée sont requis' }
 
+  // Le rattachement doit aussi être validé côté serveur, même si le formulaire est contourné.
+  const { data: bien, error: bienError } = await supabase.from('biens')
+    .select('id,type').eq('id', bien_id).eq('proprietaire_id', user.id).maybeSingle()
+  if (bienError || !bien) return { error: 'Bien introuvable ou inaccessible' }
+  const isImmeuble = ['immeuble', 'immeuble_rapport'].includes(bien.type ?? '')
+  if (isImmeuble && !lot_id) return { error: 'Sélectionnez le lot occupé dans cet immeuble.' }
+  if (lot_id) {
+    const { data: lot, error: lotError } = await supabase.from('lots')
+      .select('id').eq('id', lot_id).eq('bien_id', bien_id).eq('proprietaire_id', user.id).maybeSingle()
+    if (lotError || !lot) return { error: 'Le lot sélectionné ne correspond pas à ce bien.' }
+  }
+
   const echeance = new Date(date_entree)
   echeance.setFullYear(echeance.getFullYear() + duree_bail_ans)
   const echeance_bail = echeance.toISOString().split('T')[0]
