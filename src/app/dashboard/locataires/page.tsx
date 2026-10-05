@@ -50,7 +50,7 @@ export default async function LocatairesPage() {
     const bien = biensMap.get(bail?.bien_id ?? principal.bien_id)
     const lot = bail?.lot_id ? lotsMap.get(bail.lot_id) : undefined
     const annexes = bail ? (annexesByBail.get(bail.id)??[]) : []
-    const annexesLabels = annexes.map(lotLabel).filter(Boolean) as string[]
+    const annexesLabels = annexes.map(lot => lot.nom_personnalise?.trim() || lotLabel(lot)).filter(Boolean) as string[]
     const typeOccupation = bail?.type_occupation ?? 'individuel'
     const estGroupe = groupe.occupants.length > 1
     const total = bail ? Number(bail.loyer_hc) + Number(bail.charges) : Number(principal.loyer_hc) + Number(principal.charges)
