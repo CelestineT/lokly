@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import DeleteLocataireButton from './DeleteLocataireButton'
+import { formatLocataireName } from '@/lib/locataireName'
 
-type Locataire = { id:string; bien_id:string; bail_id:string|null; est_principal:boolean|null; nom:string; email:string; date_entree:string; date_sortie:string|null; loyer_hc:number; charges:number; caution_payee:boolean; actif:boolean; created_at:string }
+type Locataire = { id:string; bien_id:string; bail_id:string|null; est_principal:boolean|null; civilite:string|null; nom_famille:string|null; prenom:string|null; nom:string; email:string; date_entree:string; date_sortie:string|null; loyer_hc:number; charges:number; caution_payee:boolean; actif:boolean; created_at:string }
 type Bien = { id:string; nom:string; adresse:string; ville:string; type:string|null }
 type Bail = { id:string; bien_id:string; lot_id:string|null; type_occupation:string; date_entree:string; date_sortie:string|null; loyer_hc:number; charges:number; caution_payee:boolean; actif:boolean; created_at:string }
 type Lot = { id:string; bien_id:string; numero_lot:string|null; nom_personnalise:string|null; type:string|null; specificite:string|null }
@@ -62,7 +63,7 @@ export default async function LocatairesPage() {
     const dateEntree = new Date(`${dateSource}T00:00:00`).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })
     const dateSortieSource = bail?.date_sortie ?? principal.date_sortie
     const dateSortie = dateSortieSource ? new Date(`${dateSortieSource}T00:00:00`).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' }) : null
-    const titre = estGroupe ? groupe.occupants.map((o) => o.nom).join(' & ') : principal.nom
+    const titre = estGroupe ? groupe.occupants.map((o) => formatLocataireName(o)).join(' & ') : formatLocataireName(principal)
     const badgeOccupation = typeOccupation === 'bail_commun' ? `Bail commun · ${groupe.occupants.length} occupants` : typeOccupation === 'colocation' ? `Colocation · ${groupe.occupants.length} colocataires` : 'Location individuelle'
     const principalLotLabel = lotLabel(lot)
     const lotManquant = !lot && Boolean(bien && ['immeuble', 'immeuble_rapport'].includes(bien.type ?? ''))
@@ -73,7 +74,7 @@ export default async function LocatairesPage() {
       <div key={groupe.key} className="relative bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
         <Link href={ficheHref} className="absolute inset-0 rounded-2xl" aria-label={`Consulter ${titre}`} />
         <div className="flex items-start justify-between gap-3 mb-3 pointer-events-none">
-          <div className="min-w-0"><div className="flex items-center gap-2 flex-wrap"><h3 className="font-semibold text-slate-900 text-base">{titre}</h3>{termine && <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">Bail terminé</span>}</div><p className="text-xs font-medium text-blue-600 mt-0.5">{badgeOccupation}</p>{estGroupe ? <p className="text-xs text-slate-400 mt-1">Locataire principal : {principal.nom}</p> : <p className="text-xs text-slate-400">{principal.email}</p>}</div>
+          <div className="min-w-0"><div className="flex items-center gap-2 flex-wrap"><h3 className="font-semibold text-slate-900 text-base">{titre}</h3>{termine && <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">Bail terminé</span>}</div><p className="text-xs font-medium text-blue-600 mt-0.5">{badgeOccupation}</p>{estGroupe ? <p className="text-xs text-slate-400 mt-1">Locataire principal : {formatLocataireName(principal)}</p> : <p className="text-xs text-slate-400">{principal.email}</p>}</div>
           {!termine && <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full flex-shrink-0 ${cautionPayee ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{cautionPayee ? 'Caution reçue' : 'Caution en attente'}</span>}
         </div>
         {bien && <p className="text-sm text-slate-500 mb-1 pointer-events-none">⌂ {bien.nom} — {bien.ville}</p>}

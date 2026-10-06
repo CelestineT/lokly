@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { formatLocataireName } from '@/lib/locataireName'
 
 type Quittance = {
   id: string
@@ -17,7 +18,7 @@ type Quittance = {
   date_signature: string
 }
 
-type Locataire = { id: string; nom: string; bien_id: string }
+type Locataire = { id: string; nom: string; civilite:string|null; nom_famille:string|null; prenom:string|null; bien_id: string }
 type Bien = { id: string; nom: string; ville: string }
 
 function formatMois(mois: string): string {
@@ -37,7 +38,7 @@ export default function QuittancesPage() {
     const supabase = createClient()
     Promise.all([
       supabase.from('quittances').select('*').order('mois', { ascending: false }),
-      supabase.from('locataires').select('id, nom, bien_id'),
+      supabase.from('locataires').select('id, nom, civilite, nom_famille, prenom, bien_id'),
       supabase.from('biens').select('id, nom, ville'),
     ]).then(([{ data: q }, { data: l }, { data: b }]) => {
       if (q) setQuittances(q)
@@ -152,7 +153,7 @@ export default function QuittancesPage() {
                           <Link href={`/dashboard/quittances/${q.id}`} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 block hover:shadow-md transition-shadow h-full">
                             <div className="flex items-start justify-between gap-3 mb-3">
                               <div className="min-w-0">
-                                <h4 className="font-semibold text-slate-900 truncate">{locataire?.nom ?? '—'}</h4>
+                                <h4 className="font-semibold text-slate-900 truncate">{formatLocataireName(locataire, '—')}</h4>
                                 {bien && <p className="text-xs text-slate-400 truncate">{bien.nom} — {bien.ville}</p>}
                               </div>
                               <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full whitespace-nowrap ${q.envoyee ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>

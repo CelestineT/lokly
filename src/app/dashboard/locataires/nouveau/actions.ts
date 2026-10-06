@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { formatLocataireName } from '@/lib/locataireName'
 
 export async function ajouterLocataire(formData: FormData) {
   const supabase = await createClient()
@@ -61,7 +62,7 @@ export async function ajouterLocataire(formData: FormData) {
     const payload: Record<string, unknown> = {
       proprietaire_id: user.id, bien_id, bail_id: bail.id, est_principal: i === 0,
       civilite, prenom, nom_famille:nomFamille,
-      nom: `${civilite?civilite+' ':''}${nomFamille.toUpperCase()} ${prenom}`.trim(),
+      nom: formatLocataireName({civilite,nom_famille:nomFamille,prenom},''),
       email: loc.email.trim(), telephone: loc.telephone.trim() || null,
       date_entree, loyer_hc, charges, caution, caution_payee, duree_bail_ans,
       echeance_bail, mode_paiement: mode_paiement || null, commentaire: commentaire || null, actif: true,

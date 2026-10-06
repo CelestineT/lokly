@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { formatLocataireName } from '@/lib/locataireName'
 
 type Paiement = {
   id: string
@@ -16,7 +17,7 @@ type Paiement = {
   commentaire: string | null
 }
 
-type Locataire = { id: string; nom: string; bien_id: string }
+type Locataire = { id: string; nom: string; civilite:string|null; nom_famille:string|null; prenom:string|null; bien_id: string }
 type Bien = { id: string; nom: string; ville: string }
 
 function formatMois(mois: string): string {
@@ -53,7 +54,7 @@ export default function PaiementsPage() {
     const supabase = createClient()
     const [{ data: p }, { data: l }, { data: b }] = await Promise.all([
       supabase.from('paiements').select('*').order('date_paiement', { ascending: false }),
-      supabase.from('locataires').select('id, nom, bien_id'),
+      supabase.from('locataires').select('id, nom, civilite, nom_famille, prenom, bien_id'),
       supabase.from('biens').select('id, nom, ville'),
     ])
     if (p) setPaiements(p)
@@ -142,7 +143,7 @@ export default function PaiementsPage() {
             const statut = statutConfig[p.statut]
             const datePaiement = new Date(p.date_paiement).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
             return <div key={p.id} className="flex items-center justify-between px-5 py-4 first:rounded-t-2xl last:rounded-b-2xl">
-              <div><p className="font-medium text-slate-900 text-sm">{locataire?.nom ?? '—'}</p><p className="text-xs text-slate-400">{bien ? `${bien.nom} · ` : ''}{formatMois(p.mois)} · {datePaiement}</p>{p.commentaire && <p className="text-xs text-slate-400 italic mt-0.5">{p.commentaire}</p>}</div>
+              <div><p className="font-medium text-slate-900 text-sm">{formatLocataireName(locataire, '—')}</p><p className="text-xs text-slate-400">{bien ? `${bien.nom} · ` : ''}{formatMois(p.mois)} · {datePaiement}</p>{p.commentaire && <p className="text-xs text-slate-400 italic mt-0.5">{p.commentaire}</p>}</div>
               <div className="flex items-center gap-3 flex-shrink-0"><span className="font-bold text-slate-900 text-sm">{p.montant.toLocaleString('fr-FR')} €</span><span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${statut.class}`}>{statut.label}</span><div className="flex items-center gap-1 ml-1"><button type="button" onClick={() => openEdit(p)} title="Modifier le paiement" className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.5-8.5a2.121 2.121 0 013 3L12 16l-4 1 1-4 8.5-8.5z" /></svg></button><button type="button" onClick={() => annulerPaiement(p)} title="Annuler le paiement" className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button></div></div>
             </div>
           })}
