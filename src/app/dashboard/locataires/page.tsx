@@ -68,7 +68,7 @@ export default async function LocatairesPage() {
     const principalLotLabel = lotLabel(lot)
     const lotManquant = !lot && Boolean(bien && ['immeuble', 'immeuble_rapport'].includes(bien.type ?? ''))
     const ficheHref = `/dashboard/locataires/${principal.id}`
-    const modifierHref = estGroupe ? ficheHref : `/dashboard/locataires/${principal.id}/modifier`
+    const modifierHref = ficheHref
 
     return (
       <div key={groupe.key} className="relative bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
