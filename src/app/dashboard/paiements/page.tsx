@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { formatLocataireName } from '@/lib/locataireName'
 
 type Paiement = {
   id: string
@@ -16,7 +17,7 @@ type Paiement = {
   commentaire: string | null
 }
 
-type Locataire = { id: string; nom: string; bien_id: string }
+type Locataire = { id: string; nom: string; civilite:string|null; nom_famille:string|null; prenom:string|null; bien_id: string }
 type Bien = { id: string; nom: string; ville: string }
 
 function formatMois(mois: string): string {
@@ -53,7 +54,7 @@ export default function PaiementsPage() {
     const supabase = createClient()
     const [{ data: p }, { data: l }, { data: b }] = await Promise.all([
       supabase.from('paiements').select('*').order('date_paiement', { ascending: false }),
-      supabase.from('locataires').select('id, nom, bien_id'),
+      supabase.from('locataires').select('id, nom, civilite, nom_famille, prenom, bien_id'),
       supabase.from('biens').select('id, nom, ville'),
     ])
     if (p) setPaiements(p)
@@ -123,7 +124,12 @@ export default function PaiementsPage() {
       </div>
 
       <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
-        {moisDisponibles.slice(0, 6).map((m) => <button key={m} onClick={() => setFiltreMois(m)} className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${filtreMois === m ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{formatMois(m)}</button>)}
+        {moisDisponibles.slice(0, 3).map((m) => <button key={m} onClick={() => setFiltreMois(m)} className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${filtreMois === m ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{formatMois(m)}</button>)}
+        <label className="flex-shrink-0 relative w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-500 inline-flex items-center justify-center hover:bg-slate-50 focus-within:ring-2 focus-within:ring-blue-500" title="Choisir un autre mois">
+          <span className="sr-only">Choisir un autre mois</span>
+          <svg aria-hidden="true" className="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <input type="month" value={filtreMois} onChange={(e) => setFiltreMois(e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+        </label>
         {filtreMois && <button onClick={() => setFiltreMois('')} className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors">Tout voir</button>}
       </div>
 
@@ -137,7 +143,7 @@ export default function PaiementsPage() {
             const statut = statutConfig[p.statut]
             const datePaiement = new Date(p.date_paiement).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
             return <div key={p.id} className="flex items-center justify-between px-5 py-4 first:rounded-t-2xl last:rounded-b-2xl">
-              <div><p className="font-medium text-slate-900 text-sm">{locataire?.nom ?? '—'}</p><p className="text-xs text-slate-400">{bien ? `${bien.nom} · ` : ''}{formatMois(p.mois)} · {datePaiement}</p>{p.commentaire && <p className="text-xs text-slate-400 italic mt-0.5">{p.commentaire}</p>}</div>
+              <div><p className="font-medium text-slate-900 text-sm">{formatLocataireName(locataire, '—')}</p><p className="text-xs text-slate-400">{bien ? `${bien.nom} · ` : ''}{formatMois(p.mois)} · {datePaiement}</p>{p.commentaire && <p className="text-xs text-slate-400 italic mt-0.5">{p.commentaire}</p>}</div>
               <div className="flex items-center gap-3 flex-shrink-0"><span className="font-bold text-slate-900 text-sm">{p.montant.toLocaleString('fr-FR')} €</span><span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${statut.class}`}>{statut.label}</span><div className="flex items-center gap-1 ml-1"><button type="button" onClick={() => openEdit(p)} title="Modifier le paiement" className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.5-8.5a2.121 2.121 0 013 3L12 16l-4 1 1-4 8.5-8.5z" /></svg></button><button type="button" onClick={() => annulerPaiement(p)} title="Annuler le paiement" className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button></div></div>
             </div>
           })}

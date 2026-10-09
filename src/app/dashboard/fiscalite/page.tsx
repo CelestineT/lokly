@@ -69,25 +69,25 @@ export default async function FiscalitePage() {
   ))
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Fiscalité & Administratif</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Fiscalité & Administratif</h1>
         <p className="text-slate-500 text-sm mt-1">Synthèse fiscale {annee} et rappels importants.</p>
       </div>
 
       {/* Synthèse globale */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Revenus bruts {annee}</p>
-          <p className="text-2xl font-bold text-emerald-600">{totalRecettes.toLocaleString('fr-FR')} €</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-5 flex items-center justify-between gap-4 sm:block">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide sm:mb-1">Revenus bruts {annee}</p>
+          <p className="text-xl sm:text-2xl font-bold text-emerald-600 whitespace-nowrap">{totalRecettes.toLocaleString('fr-FR')} €</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Charges déductibles</p>
-          <p className="text-2xl font-bold text-rose-500">{totalCharges.toLocaleString('fr-FR')} €</p>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-5 flex items-center justify-between gap-4 sm:block">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide sm:mb-1">Charges déductibles</p>
+          <p className="text-xl sm:text-2xl font-bold text-rose-500 whitespace-nowrap">{totalCharges.toLocaleString('fr-FR')} €</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Revenu net imposable estimé</p>
-          <p className="text-2xl font-bold text-blue-600">{totalImposable.toLocaleString('fr-FR')} €</p>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-5 flex items-center justify-between gap-4 sm:block">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide sm:mb-1">Revenu net imposable estimé</p>
+          <p className="text-xl sm:text-2xl font-bold text-blue-600 whitespace-nowrap">{totalImposable.toLocaleString('fr-FR')} €</p>
         </div>
       </div>
 
@@ -131,8 +131,8 @@ export default async function FiscalitePage() {
         <div className="space-y-4">
           <h2 className="text-base font-semibold text-slate-800">Détail par bien</h2>
           {stats.map(({ bien, recettes, charges, regime, abattement, revenuImposable }) => (
-            <div key={bien.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-              <div className="flex items-start justify-between gap-3 mb-4">
+            <div key={bien.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-5">
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-3 mb-4">
                 <div>
                   <h3 className="font-semibold text-slate-900">{bien.nom}</h3>
                   <p className="text-xs text-slate-400">{bien.ville}</p>

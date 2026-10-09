@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { formatLocataireName } from '@/lib/locataireName'
 
 type Quittance = {
   id: string
@@ -17,7 +18,7 @@ type Quittance = {
   date_signature: string
 }
 
-type Locataire = { id: string; nom: string; bien_id: string }
+type Locataire = { id: string; nom: string; civilite:string|null; nom_famille:string|null; prenom:string|null; bien_id: string }
 type Bien = { id: string; nom: string; ville: string }
 
 function formatMois(mois: string): string {
@@ -31,12 +32,13 @@ export default function QuittancesPage() {
   const [quittances, setQuittances] = useState<Quittance[]>([])
   const [locataires, setLocataires] = useState<Locataire[]>([])
   const [biens, setBiens] = useState<Bien[]>([])
+  const [filtreMois, setFiltreMois] = useState('')
 
   useEffect(() => {
     const supabase = createClient()
     Promise.all([
       supabase.from('quittances').select('*').order('mois', { ascending: false }),
-      supabase.from('locataires').select('id, nom, bien_id'),
+      supabase.from('locataires').select('id, nom, civilite, nom_famille, prenom, bien_id'),
       supabase.from('biens').select('id, nom, ville'),
     ]).then(([{ data: q }, { data: l }, { data: b }]) => {
       if (q) setQuittances(q)
@@ -63,6 +65,7 @@ export default function QuittancesPage() {
   }
 
   const sortedMois = Array.from(grouped.keys()).sort((a, b) => b.localeCompare(a))
+  const moisAffiches = filtreMois ? sortedMois.filter((mois) => mois === filtreMois) : sortedMois
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -82,6 +85,23 @@ export default function QuittancesPage() {
         </Link>
       </div>
 
+      {quittances.length > 0 && (
+        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
+          {sortedMois.slice(0, 3).map((mois) => (
+            <button key={mois} type="button" onClick={() => setFiltreMois(mois)}
+              className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${filtreMois === mois ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+              {formatMois(mois)}
+            </button>
+          ))}
+          <label className="flex-shrink-0 relative w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-500 inline-flex items-center justify-center hover:bg-slate-50 focus-within:ring-2 focus-within:ring-blue-500" title="Choisir un autre mois">
+            <span className="sr-only">Choisir un autre mois</span>
+            <svg aria-hidden="true" className="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            <input aria-label="Choisir un autre mois" type="month" value={filtreMois} onChange={(e) => setFiltreMois(e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+          </label>
+          {filtreMois && <button type="button" onClick={() => setFiltreMois('')} className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors">Tout voir</button>}
+        </div>
+      )}
+
       {quittances.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 flex flex-col items-center text-center">
           <h2 className="text-lg font-semibold text-slate-800 mb-2">Aucune quittance pour le moment</h2>
@@ -93,7 +113,7 @@ export default function QuittancesPage() {
         </div>
       ) : (
         <div className="space-y-10">
-          {sortedMois.map((mois) => {
+          {moisAffiches.map((mois) => {
             const byBien = grouped.get(mois)!
             const sortedBienIds = Array.from(byBien.keys()).sort((a, b) => {
               const ba = biensMap.get(a)
@@ -133,7 +153,7 @@ export default function QuittancesPage() {
                           <Link href={`/dashboard/quittances/${q.id}`} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 block hover:shadow-md transition-shadow h-full">
                             <div className="flex items-start justify-between gap-3 mb-3">
                               <div className="min-w-0">
-                                <h4 className="font-semibold text-slate-900 truncate">{locataire?.nom ?? '—'}</h4>
+                                <h4 className="font-semibold text-slate-900 truncate">{formatLocataireName(locataire, '—')}</h4>
                                 {bien && <p className="text-xs text-slate-400 truncate">{bien.nom} — {bien.ville}</p>}
                               </div>
                               <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full whitespace-nowrap ${q.envoyee ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -158,6 +178,11 @@ export default function QuittancesPage() {
               </section>
             )
           })}
+          {moisAffiches.length === 0 && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-10 text-center">
+              <p className="text-slate-500 text-sm">Aucune quittance pour ce mois.</p>
+            </div>
+          )}
         </div>
       )}
     </div>
