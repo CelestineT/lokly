@@ -7,7 +7,7 @@ import {createClient} from '@/lib/supabase/client'
 type Lot={id:string;numero_lot:string|null;nom_personnalise:string|null;type:string|null;specificite:string|null}
 const lotLabel=(l:Lot)=>{const nom=l.nom_personnalise?.trim();const type=l.type?l.type.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase()):'Lot';return nom||[l.numero_lot?`Lot ${l.numero_lot}`:null,l.specificite||type].filter(Boolean).join(' — ')||type}
 const CHARGES=[
-  ['eau_froide','Eau froide'],['eau_chaude','Eau chaude'],['chauffage','Chauffage collectif'],['electricite_communs','Électricité des parties communes'],['entretien_communs','Entretien des parties communes'],['ascenseur','Ascenseur'],['teom','Taxe d’enlèvement des ordures ménagères (TEOM)'],['gardiennage','Gardiennage / concierge'],['espaces_verts','Entretien des espaces verts'],['autre','Autre']
+  ['eau_froide','Eau froide'],['eau_chaude','Eau chaude'],['chauffage','Chauffage'],['electricite_communs','Électricité des parties communes'],['entretien_communs','Entretien des parties communes'],['ascenseur','Ascenseur'],['teom','Taxe d’enlèvement des ordures ménagères (TEOM)'],['gardiennage','Gardiennage / concierge'],['espaces_verts','Entretien des espaces verts'],['autre','Autre']
 ] as const
 export default function ModifierBailPage({params}:{params:Promise<{id:string}>}){
   const router=useRouter()
