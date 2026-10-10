@@ -1,0 +1,4 @@
+// Une seule présentation par lot. Le dernier rattachement applicable prévaut.
+// Aucun enregistrement historique n'est supprimé.
+export function uniqueAnnexes<T extends {lot_id:string;date_debut?:string;id?:string}>(rows:T[]):T[]{const result=new Map<string,T>();for(const row of rows){const old=result.get(row.lot_id);if(!old||(row.date_debut??'')>(old.date_debut??'')||((row.date_debut??'')===(old.date_debut??'')&&(row.id??'')>(old.id??'')))result.set(row.lot_id,row)}return [...result.values()]}
+export function includedAnnexes(values:unknown):string[]{const labels:Record<string,string>={box:'Box',garage:'Garage',parking:'Parking',cave:'Cave',balcon:'Balcon',terrasse:'Terrasse',grenier:'Grenier',cour:'Cour',jardin:'Jardin'};return Array.isArray(values)?[...new Set(values.filter((v):v is string=>typeof v==='string').map(v=>labels[v]||v))]:[]}

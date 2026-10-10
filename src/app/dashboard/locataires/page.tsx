@@ -1,13 +1,14 @@
+import {uniqueAnnexes,includedAnnexes} from '@/lib/annexeRows'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import DeleteLocataireButton from './DeleteLocataireButton'
 import { formatLocataireName } from '@/lib/locataireName'
 
 type Locataire = { id:string; bien_id:string; bail_id:string|null; est_principal:boolean|null; civilite:string|null; nom_famille:string|null; prenom:string|null; nom:string; email:string; date_entree:string; date_sortie:string|null; loyer_hc:number; charges:number; caution_payee:boolean; actif:boolean; created_at:string }
-type Bien = { id:string; nom:string; adresse:string; ville:string; type:string|null }
+type Bien = { id:string; nom:string; adresse:string; ville:string; type:string|null; annexes:string[]|null }
 type Bail = { id:string; bien_id:string; lot_id:string|null; type_occupation:string; date_entree:string; date_sortie:string|null; loyer_hc:number; charges:number; caution_payee:boolean; actif:boolean; created_at:string }
-type Lot = { id:string; bien_id:string; numero_lot:string|null; nom_personnalise:string|null; type:string|null; specificite:string|null }
-type Affectation = { bail_id:string; lot_id:string; date_fin:string|null; prix_mensuel:number }
+type Lot = { id:string; bien_id:string; numero_lot:string|null; nom_personnalise:string|null; type:string|null; specificite:string|null; annexes:string[]|null }
+type Affectation = { bail_id:string; lot_id:string; date_fin:string|null; date_debut:string; prix_mensuel:number }
 type AnnexeFacturee = { lot:Lot|undefined; lot_id:string; prix_mensuel:number }
 type GroupeOccupation = { key:string; bail:Bail|null; occupants:Locataire[] }
 const formatLotType=(value:string|null|undefined)=>{if(!value)return null;return value.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}
@@ -17,10 +18,10 @@ export default async function LocatairesPage() {
   const supabase = await createClient()
   const [{ data: locatairesData },{ data: biensData },{ data: bauxData },{ data: lotsData },{ data: affectationsData }] = await Promise.all([
     supabase.from('locataires').select('*').order('created_at', { ascending: false }),
-    supabase.from('biens').select('id, nom, adresse, ville, type'),
+    supabase.from('biens').select('id, nom, adresse, ville, type, annexes'),
     supabase.from('baux').select('id, bien_id, lot_id, type_occupation, date_entree, date_sortie, loyer_hc, charges, caution_payee, actif, created_at'),
-    supabase.from('lots').select('id, bien_id, numero_lot, nom_personnalise, type, specificite'),
-    supabase.from('affectations_lots_baux').select('bail_id, lot_id, date_fin, prix_mensuel').is('date_fin',null)
+    supabase.from('lots').select('id, bien_id, numero_lot, nom_personnalise, type, specificite, annexes'),
+    supabase.from('affectations_lots_baux').select('bail_id, lot_id, date_debut, date_fin, prix_mensuel').is('date_fin',null)
   ])
 
   const locataires: Locataire[] = locatairesData ?? []
@@ -32,7 +33,7 @@ export default async function LocatairesPage() {
   const bauxMap = new Map(baux.map((b) => [b.id, b]))
   const lotsMap = new Map(lots.map((l) => [l.id, l]))
   const annexesByBail = new Map<string,AnnexeFacturee[]>()
-  for(const a of affectations){const arr=annexesByBail.get(a.bail_id)??[];arr.push({lot:lotsMap.get(a.lot_id),lot_id:a.lot_id,prix_mensuel:Number(a.prix_mensuel??0)});annexesByBail.set(a.bail_id,arr)}
+  for(const a of [...new Set(affectations.map(a=>a.bail_id))].flatMap(id=>uniqueAnnexes(affectations.filter(a=>a.bail_id===id)))){const arr=annexesByBail.get(a.bail_id)??[];arr.push({lot:lotsMap.get(a.lot_id),lot_id:a.lot_id,prix_mensuel:Number(a.prix_mensuel??0)});annexesByBail.set(a.bail_id,arr)}
 
   const groupesMap = new Map<string, GroupeOccupation>()
   for (const loc of locataires) {
@@ -52,6 +53,7 @@ export default async function LocatairesPage() {
     const bien = biensMap.get(bail?.bien_id ?? principal.bien_id)
     const lot = bail?.lot_id ? lotsMap.get(bail.lot_id) : undefined
     const annexes = bail ? (annexesByBail.get(bail.id)??[]) : []
+    const incluses=includedAnnexes(lot?.annexes??bien?.annexes);
     const annexesTotal = annexes.reduce((sum, annexe) => sum + annexe.prix_mensuel, 0)
     const typeOccupation = bail?.type_occupation ?? 'individuel'
     const estGroupe = groupe.occupants.length > 1
@@ -79,6 +81,7 @@ export default async function LocatairesPage() {
         </div>
         {bien && <p className="text-sm text-slate-500 mb-1 pointer-events-none">⌂ {bien.nom} — {bien.ville}</p>}
         {principalLotLabel && <p className="text-xs text-slate-500 pointer-events-none"><span className="font-medium">Lot occupé :</span> {principalLotLabel}</p>}
+        {incluses.length>0&&<p className="text-xs text-slate-500 mt-1 pointer-events-none">{incluses.join(', ')} <span>(annexes incluses)</span></p>}
         {lotManquant && <div className="relative z-10 mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800"><p>Lot occupé non renseigné : son intitulé ne peut pas être affiché.</p>{bail && <Link href={`/dashboard/locataires/${principal.id}/modifier-bail`} className="inline-block mt-1 font-medium underline">Renseigner le lot occupé</Link>}</div>}
         <div className="mt-3 space-y-1 text-xs text-slate-500 pointer-events-none">
           <div className="flex justify-between gap-3"><span>Loyer hors charges</span><span>{loyer.toLocaleString('fr-FR')} € / mois</span></div>
@@ -91,5 +94,7 @@ export default async function LocatairesPage() {
     )
   }
 
-  return <div className="p-6 max-w-5xl mx-auto"><div className="flex items-center justify-between mb-6"><div><h1 className="text-2xl font-bold text-slate-900">Mes locataires</h1><p className="text-slate-500 text-sm mt-1">{nbActifs} locataire{nbActifs !== 1 ? 's' : ''} actif{nbActifs !== 1 ? 's' : ''}</p></div><Link href="/dashboard/locataires/nouveau" className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors">+ Ajouter un locataire</Link></div>{groupesActifs.length === 0 ? <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-10 text-center mb-8"><h2 className="text-lg font-semibold text-slate-800 mb-2">Aucun locataire actif</h2><p className="text-slate-500 text-sm">Les anciens locataires restent accessibles dans l’historique ci-dessous.</p></div> : <div className="grid gap-4 sm:grid-cols-2 mb-10">{groupesActifs.map((g) => renderGroupe(g))}</div>}{groupesTermines.length > 0 && <section><div className="mb-4"><h2 className="text-lg font-semibold text-slate-900">Résiliations et fins de bail</h2><p className="text-sm text-slate-500 mt-1">Historique des locataires dont la location est terminée.</p></div><div className="grid gap-4 sm:grid-cols-2">{groupesTermines.map((g) => renderGroupe(g, true))}</div></section>}</div>
+  function renderBiens(groups:GroupeOccupation[],termine=false){const byBien=new Map<string,GroupeOccupation[]>();for(const g of groups){const id=g.bail?.bien_id??g.occupants[0].bien_id;byBien.set(id,[...(byBien.get(id)??[]),g])}return [...byBien.entries()].sort(([a],[b])=>{const x=biensMap.get(a),y=biensMap.get(b);return `${x?.ville??''} ${x?.adresse??''} ${x?.nom??''}`.localeCompare(`${y?.ville??''} ${y?.adresse??''} ${y?.nom??''}`,'fr',{numeric:true})}).map(([id,gs])=>{const b=biensMap.get(id);return <section key={id} className="mb-7"><h3 className="font-semibold text-slate-900">{b?.nom??'Bien non renseigné'}</h3><p className="text-sm text-slate-500 mb-3">{b?.adresse}{b?.ville?` — ${b.ville}`:''}</p><div className="grid gap-4 sm:grid-cols-2">{gs.sort((a,b)=>formatLocataireName(a.occupants.find(o=>o.est_principal)??a.occupants[0]).localeCompare(formatLocataireName(b.occupants.find(o=>o.est_principal)??b.occupants[0]),'fr')).map(g=>renderGroupe(g,termine))}</div></section>})}
+
+  return <div className="p-6 max-w-5xl mx-auto"><div className="flex items-center justify-between mb-6"><div><h1 className="text-2xl font-bold text-slate-900">Mes locataires</h1><p className="text-slate-500 text-sm mt-1">{nbActifs} locataire{nbActifs !== 1 ? 's' : ''} actif{nbActifs !== 1 ? 's' : ''}</p></div><Link href="/dashboard/locataires/nouveau" className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors">+ Ajouter un locataire</Link></div>{groupesActifs.length === 0 ? <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-10 text-center mb-8"><h2 className="text-lg font-semibold text-slate-800 mb-2">Aucun locataire actif</h2><p className="text-slate-500 text-sm">Les anciens locataires restent accessibles dans l’historique ci-dessous.</p></div> : <div className="mb-10">{renderBiens(groupesActifs)}</div>}{groupesTermines.length > 0 && <section><div className="mb-4"><h2 className="text-lg font-semibold text-slate-900">Résiliations et fins de bail</h2><p className="text-sm text-slate-500 mt-1">Historique des locataires dont la location est terminée.</p></div><div>{renderBiens(groupesTermines,true)}</div></section>}</div>
 }

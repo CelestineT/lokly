@@ -1,5 +1,6 @@
 'use client'
 
+import PeriodNavigation from '@/components/PeriodNavigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -65,7 +66,7 @@ export default function QuittancesPage() {
   }
 
   const sortedMois = Array.from(grouped.keys()).sort((a, b) => b.localeCompare(a))
-  const moisAffiches = filtreMois ? sortedMois.filter((mois) => mois === filtreMois) : sortedMois
+  const moisAffiches = filtreMois ? sortedMois.filter((mois) => mois.startsWith(filtreMois)) : sortedMois
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -85,22 +86,7 @@ export default function QuittancesPage() {
         </Link>
       </div>
 
-      {quittances.length > 0 && (
-        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
-          {sortedMois.slice(0, 3).map((mois) => (
-            <button key={mois} type="button" onClick={() => setFiltreMois(mois)}
-              className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${filtreMois === mois ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-              {formatMois(mois)}
-            </button>
-          ))}
-          <label className="flex-shrink-0 relative w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-500 inline-flex items-center justify-center hover:bg-slate-50 focus-within:ring-2 focus-within:ring-blue-500" title="Choisir un autre mois">
-            <span className="sr-only">Choisir un autre mois</span>
-            <svg aria-hidden="true" className="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            <input aria-label="Choisir un autre mois" type="month" value={filtreMois} onChange={(e) => setFiltreMois(e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-          </label>
-          {filtreMois && <button type="button" onClick={() => setFiltreMois('')} className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors">Tout voir</button>}
-        </div>
-      )}
+      <div className="md:grid md:grid-cols-[180px_minmax(0,1fr)] gap-5"><PeriodNavigation months={sortedMois} value={filtreMois} onChange={setFiltreMois}/><div className="min-w-0">
 
       {quittances.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 flex flex-col items-center text-center">
@@ -131,7 +117,7 @@ export default function QuittancesPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
                   {sortedBienIds.flatMap((bienId) => {
-                    const items = byBien.get(bienId)!
+                    const items = byBien.get(bienId)!.sort((a,b)=>formatLocataireName(locatairesMap.get(a.locataire_id),'').localeCompare(formatLocataireName(locatairesMap.get(b.locataire_id),''),'fr')||a.id.localeCompare(b.id))
                     const bien = biensMap.get(bienId)
 
                     return items.map((q, index) => {
@@ -185,6 +171,7 @@ export default function QuittancesPage() {
           )}
         </div>
       )}
+      </div></div>
     </div>
   )
 }
