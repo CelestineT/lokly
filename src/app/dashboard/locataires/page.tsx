@@ -1,3 +1,5 @@
+import OrderedCards from '@/components/OrderedCards'
+import {getCardOrders} from '@/lib/cardOrderServer'
 import {uniqueAnnexes,includedAnnexes} from '@/lib/annexeRows'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
@@ -16,6 +18,7 @@ const lotLabel=(lot:Lot|undefined)=>{if(!lot)return null;const type=formatLotTyp
 
 export default async function LocatairesPage() {
   const supabase = await createClient()
+  const orders=await getCardOrders()
   const [{ data: locatairesData },{ data: biensData },{ data: bauxData },{ data: lotsData },{ data: affectationsData }] = await Promise.all([
     supabase.from('locataires').select('*').order('created_at', { ascending: false }),
     supabase.from('biens').select('id, nom, adresse, ville, type, annexes'),
@@ -94,7 +97,14 @@ export default async function LocatairesPage() {
     )
   }
 
-  function renderBiens(groups:GroupeOccupation[],termine=false){const byBien=new Map<string,GroupeOccupation[]>();for(const g of groups){const id=g.bail?.bien_id??g.occupants[0].bien_id;byBien.set(id,[...(byBien.get(id)??[]),g])}return [...byBien.entries()].sort(([a],[b])=>{const x=biensMap.get(a),y=biensMap.get(b);return `${x?.ville??''} ${x?.adresse??''} ${x?.nom??''}`.localeCompare(`${y?.ville??''} ${y?.adresse??''} ${y?.nom??''}`,'fr',{numeric:true})}).map(([id,gs])=>{const b=biensMap.get(id);return <section key={id} className="mb-7"><h3 className="font-semibold text-slate-900">{b?.nom??'Bien non renseigné'}</h3><p className="text-sm text-slate-500 mb-3">{b?.adresse}{b?.ville?` — ${b.ville}`:''}</p><div className="grid gap-4 sm:grid-cols-2">{gs.sort((a,b)=>formatLocataireName(a.occupants.find(o=>o.est_principal)??a.occupants[0]).localeCompare(formatLocataireName(b.occupants.find(o=>o.est_principal)??b.occupants[0]),'fr')).map(g=>renderGroupe(g,termine))}</div></section>})}
+  function renderBiens(groups:GroupeOccupation[],termine=false){
+    const byBien=new Map<string,GroupeOccupation[]>();for(const g of groups){const id=g.bail?.bien_id??g.occupants[0].bien_id;byBien.set(id,[...(byBien.get(id)??[]),g])}
+    const sections=[...byBien.entries()].sort(([a],[b])=>{const x=biensMap.get(a),y=biensMap.get(b);return `${x?.ville??''} ${x?.adresse??''} ${x?.nom??''}`.localeCompare(`${y?.ville??''} ${y?.adresse??''} ${y?.nom??''}`,'fr',{numeric:true})}).map(([id,gs])=>{
+      const b=biensMap.get(id),scope=`locataires:${id}:${termine?'termines':'actifs'}`;
+      const items=[...gs].sort((a,b)=>formatLocataireName(a.occupants.find(o=>o.est_principal)??a.occupants[0]).localeCompare(formatLocataireName(b.occupants.find(o=>o.est_principal)??b.occupants[0]),'fr')).map(g=>({id:g.key,label:formatLocataireName(g.occupants.find(o=>o.est_principal)??g.occupants[0]),content:renderGroupe(g,termine)}));
+      return {id,label:b?.nom??'Bien non renseigné',content:<section className="mb-7"><h3 className="font-semibold text-slate-900">{b?.nom??'Bien non renseigné'}</h3><p className="text-sm text-slate-500 mb-3">{b?.adresse}{b?.ville?` — ${b.ville}`:''}</p><OrderedCards scope={scope} saved={orders[scope]} className="grid gap-4 sm:grid-cols-2" label="Réorganiser les locataires" items={items}/></section>}
+    });const scope=`locataires:immeubles:${termine?'termines':'actifs'}`;return <OrderedCards scope={scope} saved={orders[scope]} label="Réorganiser les immeubles" items={sections}/>
+  }
 
   return <div className="p-6 max-w-5xl mx-auto"><div className="flex items-center justify-between mb-6"><div><h1 className="text-2xl font-bold text-slate-900">Mes locataires</h1><p className="text-slate-500 text-sm mt-1">{nbActifs} locataire{nbActifs !== 1 ? 's' : ''} actif{nbActifs !== 1 ? 's' : ''}</p></div><Link href="/dashboard/locataires/nouveau" className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors">+ Ajouter un locataire</Link></div>{groupesActifs.length === 0 ? <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-10 text-center mb-8"><h2 className="text-lg font-semibold text-slate-800 mb-2">Aucun locataire actif</h2><p className="text-slate-500 text-sm">Les anciens locataires restent accessibles dans l’historique ci-dessous.</p></div> : <div className="mb-10">{renderBiens(groupesActifs)}</div>}{groupesTermines.length > 0 && <section><div className="mb-4"><h2 className="text-lg font-semibold text-slate-900">Résiliations et fins de bail</h2><p className="text-sm text-slate-500 mt-1">Historique des locataires dont la location est terminée.</p></div><div>{renderBiens(groupesTermines,true)}</div></section>}</div>
 }

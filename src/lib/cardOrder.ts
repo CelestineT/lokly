@@ -1,0 +1,2 @@
+export function orderedIds(ids:string[],saved:string[]=[]){const available=new Set(ids);return [...new Set([...saved.filter(id=>available.has(id)),...ids])]}
+export function moveCard(ids:string[],index:number,delta:number){const target=index+delta;if(index<0||index>=ids.length||target<0||target>=ids.length)return ids;const result=[...ids];[result[index],result[target]]=[result[target],result[index]];return result}

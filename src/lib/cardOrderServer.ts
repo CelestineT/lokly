@@ -1,0 +1,2 @@
+import {createClient} from '@/lib/supabase/server'
+export async function getCardOrders():Promise<Record<string,string[]>>{const s=await createClient(),{data:{user}}=await s.auth.getUser();if(!user)return{};const{data}=await s.from('profiles').select('*').eq('id',user.id).maybeSingle();const raw=data?.ordre_affichage;if(!raw||typeof raw!=='object'||Array.isArray(raw))return{};return Object.fromEntries(Object.entries(raw).filter(([,v])=>Array.isArray(v)&&v.every(x=>typeof x==='string'))) as Record<string,string[]>}
