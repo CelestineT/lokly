@@ -1,3 +1,5 @@
+import {randomInt} from 'crypto'
+import {deliveryConfig,emailText} from '@/lib/quittanceDelivery'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Générer un code OTP à 6 chiffres
-    const code = String(Math.floor(100000 + Math.random() * 900000))
+    const code = String(randomInt(100000,1000000))
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
 
     const { error: upsertErr } = await supabase.from('otp_codes').upsert({
@@ -42,9 +44,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
     }
 
-    // Mode test : on retourne le code directement (pas d'email)
-    // À remplacer par un envoi Resend quand le domaine sera vérifié
-    return NextResponse.json({ ok: true, code })
+    if(process.env.QUITTANCE_EMAIL_MODE==='production'){
+      let config;try{config=deliveryConfig(user.email??'',user.email??'')}catch(e){return NextResponse.json({error:(e as Error).message},{status:503})}
+      const result=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${process.env.RESEND_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({from:config.from,to:[user.email],subject:'Ekolocs — code de confirmation',html:`<p>Votre code de confirmation : <strong>${emailText(code)}</strong></p><p>Valable 10 minutes.</p>`})});
+      if(!result.ok)return NextResponse.json({error:'Le code n’a pas pu être envoyé au bailleur.'},{status:502});
+      return NextResponse.json({ok:true});
+    }
+    // Recette uniquement : aucun message réel envoyé au bailleur.
+    return NextResponse.json({ ok: true, code });
 
   } catch (err) {
     console.error('quittance-otp error:', err)
