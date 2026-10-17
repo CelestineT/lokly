@@ -1,0 +1,4 @@
+'use server'
+import {createClient} from '@/lib/supabase/server'
+import {revalidatePath} from 'next/cache'
+export async function saveCardOrder(scope:string,ids:string[]){if(typeof scope!=='string'||scope.length>120||!(scope==='biens'||scope.startsWith('locataires:'))||!Array.isArray(ids)||ids.length>1000||ids.some(id=>typeof id!=='string'||id.length>160)||new Set(ids).size!==ids.length)return{error:'Classement invalide.'};const s=await createClient(),{data:{user}}=await s.auth.getUser();if(!user)return{error:'Vous devez être connecté.'};const{error}=await s.rpc('enregistrer_ordre_affichage',{p_scope:scope,p_ids:ids});if(error)return{error:/function|schema cache|column/i.test(error.message)?'Exécutez la nouvelle requête SQL « différé et ordre d’affichage » pour enregistrer ce classement.':error.message};revalidatePath('/dashboard/biens');revalidatePath('/dashboard/locataires');return{ok:true}}

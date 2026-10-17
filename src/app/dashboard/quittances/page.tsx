@@ -1,8 +1,10 @@
 'use client'
 
+import PeriodNavigation from '@/components/PeriodNavigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { formatLocataireName } from '@/lib/locataireName'
 
 type Quittance = {
   id: string
@@ -17,7 +19,7 @@ type Quittance = {
   date_signature: string
 }
 
-type Locataire = { id: string; nom: string; bien_id: string }
+type Locataire = { id: string; nom: string; civilite:string|null; nom_famille:string|null; prenom:string|null; bien_id: string }
 type Bien = { id: string; nom: string; ville: string }
 
 function formatMois(mois: string): string {
@@ -31,12 +33,13 @@ export default function QuittancesPage() {
   const [quittances, setQuittances] = useState<Quittance[]>([])
   const [locataires, setLocataires] = useState<Locataire[]>([])
   const [biens, setBiens] = useState<Bien[]>([])
+  const [filtreMois, setFiltreMois] = useState('')
 
   useEffect(() => {
     const supabase = createClient()
     Promise.all([
       supabase.from('quittances').select('*').order('mois', { ascending: false }),
-      supabase.from('locataires').select('id, nom, bien_id'),
+      supabase.from('locataires').select('id, nom, civilite, nom_famille, prenom, bien_id'),
       supabase.from('biens').select('id, nom, ville'),
     ]).then(([{ data: q }, { data: l }, { data: b }]) => {
       if (q) setQuittances(q)
@@ -63,6 +66,7 @@ export default function QuittancesPage() {
   }
 
   const sortedMois = Array.from(grouped.keys()).sort((a, b) => b.localeCompare(a))
+  const moisAffiches = filtreMois ? sortedMois.filter((mois) => mois.startsWith(filtreMois)) : sortedMois
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -82,6 +86,8 @@ export default function QuittancesPage() {
         </Link>
       </div>
 
+      <div className="md:grid md:grid-cols-[180px_minmax(0,1fr)] gap-5"><PeriodNavigation months={sortedMois} value={filtreMois} onChange={setFiltreMois}/><div className="min-w-0">
+
       {quittances.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 flex flex-col items-center text-center">
           <h2 className="text-lg font-semibold text-slate-800 mb-2">Aucune quittance pour le moment</h2>
@@ -93,7 +99,7 @@ export default function QuittancesPage() {
         </div>
       ) : (
         <div className="space-y-10">
-          {sortedMois.map((mois) => {
+          {moisAffiches.map((mois) => {
             const byBien = grouped.get(mois)!
             const sortedBienIds = Array.from(byBien.keys()).sort((a, b) => {
               const ba = biensMap.get(a)
@@ -111,7 +117,7 @@ export default function QuittancesPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
                   {sortedBienIds.flatMap((bienId) => {
-                    const items = byBien.get(bienId)!
+                    const items = byBien.get(bienId)!.sort((a,b)=>formatLocataireName(locatairesMap.get(a.locataire_id),'').localeCompare(formatLocataireName(locatairesMap.get(b.locataire_id),''),'fr')||a.id.localeCompare(b.id))
                     const bien = biensMap.get(bienId)
 
                     return items.map((q, index) => {
@@ -133,7 +139,7 @@ export default function QuittancesPage() {
                           <Link href={`/dashboard/quittances/${q.id}`} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 block hover:shadow-md transition-shadow h-full">
                             <div className="flex items-start justify-between gap-3 mb-3">
                               <div className="min-w-0">
-                                <h4 className="font-semibold text-slate-900 truncate">{locataire?.nom ?? '—'}</h4>
+                                <h4 className="font-semibold text-slate-900 truncate">{formatLocataireName(locataire, '—')}</h4>
                                 {bien && <p className="text-xs text-slate-400 truncate">{bien.nom} — {bien.ville}</p>}
                               </div>
                               <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full whitespace-nowrap ${q.envoyee ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -158,8 +164,14 @@ export default function QuittancesPage() {
               </section>
             )
           })}
+          {moisAffiches.length === 0 && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-10 text-center">
+              <p className="text-slate-500 text-sm">Aucune quittance pour ce mois.</p>
+            </div>
+          )}
         </div>
       )}
+      </div></div>
     </div>
   )
 }
