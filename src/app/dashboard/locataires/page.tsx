@@ -1,7 +1,8 @@
-import {rentAt,withRentAt} from '@/lib/rentHistory'
+import {leaseAmounts,rentalDate,rentalPrincipal} from '@/lib/rentalTotals'
+import {readAllRows} from '@/lib/readAllRows'
 import OrderedCards from '@/components/OrderedCards'
 import {getCardOrders} from '@/lib/cardOrderServer'
-import {uniqueAnnexes,includedAnnexes} from '@/lib/annexeRows'
+import {includedAnnexes} from '@/lib/annexeRows'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import DeleteLocataireButton from './DeleteLocataireButton'
@@ -12,7 +13,6 @@ type Bien = { id:string; nom:string; adresse:string; ville:string; type:string|n
 type Bail = { id:string; bien_id:string; lot_id:string|null; type_occupation:string; date_entree:string; date_sortie:string|null; loyer_hc:number; charges:number; caution_payee:boolean; actif:boolean; created_at:string }
 type Lot = { id:string; bien_id:string; numero_lot:string|null; nom_personnalise:string|null; type:string|null; specificite:string|null; annexes:string[]|null }
 type Affectation = { bail_id:string; lot_id:string; date_fin:string|null; date_debut:string; prix_mensuel:number }
-type AnnexeFacturee = { lot:Lot|undefined; lot_id:string; prix_mensuel:number }
 type GroupeOccupation = { key:string; bail:Bail|null; occupants:Locataire[] }
 const formatLotType=(value:string|null|undefined)=>{if(!value)return null;return value.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}
 const lotLabel=(lot:Lot|undefined)=>{if(!lot)return null;const type=formatLotType(lot.type);const personnalise=lot.nom_personnalise?.trim();if(type&&personnalise)return `${type} — ${personnalise}`;return type||personnalise||(lot.numero_lot?`Lot ${lot.numero_lot}`:null)||lot.specificite||null}
@@ -21,23 +21,21 @@ export default async function LocatairesPage() {
   const supabase = await createClient()
   const orders=await getCardOrders()
   const [{ data: locatairesData },{ data: biensData },{ data: bauxData },{ data: lotsData },{ data: affectationsData }] = await Promise.all([
-    supabase.from('locataires').select('*').order('created_at', { ascending: false }),
+    readAllRows(supabase.from('locataires').select('*').order('created_at', { ascending: false })),
     supabase.from('biens').select('id, nom, adresse, ville, type, annexes'),
-    supabase.from('baux').select('*'),
+    readAllRows(supabase.from('baux').select('*')),
     supabase.from('lots').select('id, bien_id, numero_lot, nom_personnalise, type, specificite, annexes'),
-    supabase.from('affectations_lots_baux').select('bail_id, lot_id, date_debut, date_fin, prix_mensuel').is('date_fin',null)
+    readAllRows(supabase.from('affectations_lots_baux').select('id, bail_id, lot_id, date_debut, date_fin, prix_mensuel'))
   ])
 
   const locataires: Locataire[] = locatairesData ?? []
   const biens: Bien[] = biensData ?? []
-  const baux: Bail[] = (bauxData ?? []).map(b=>withRentAt(b))
+  const baux: Bail[] = bauxData ?? []
   const lots: Lot[] = lotsData ?? []
   const affectations: Affectation[] = affectationsData ?? []
   const biensMap = new Map(biens.map((b) => [b.id, b]))
   const bauxMap = new Map(baux.map((b) => [b.id, b]))
   const lotsMap = new Map(lots.map((l) => [l.id, l]))
-  const annexesByBail = new Map<string,AnnexeFacturee[]>()
-  for(const a of [...new Set(affectations.map(a=>a.bail_id))].flatMap(id=>uniqueAnnexes(affectations.filter(a=>a.bail_id===id)))){const arr=annexesByBail.get(a.bail_id)??[];arr.push({lot:lotsMap.get(a.lot_id),lot_id:a.lot_id,prix_mensuel:Number(a.prix_mensuel??0)});annexesByBail.set(a.bail_id,arr)}
 
   const groupesMap = new Map<string, GroupeOccupation>()
   for (const loc of locataires) {
@@ -47,23 +45,21 @@ export default async function LocatairesPage() {
     else groupesMap.set(key, { key, bail: loc.bail_id ? (bauxMap.get(loc.bail_id) ?? null) : null, occupants: [loc] })
   }
   const groupes = Array.from(groupesMap.values())
-  const groupesActifs = groupes.filter((g) => g.occupants.some((o) => o.actif))
-  const groupesTermines = groupes.filter((g) => !g.occupants.some((o) => o.actif))
+  const termine=(g:GroupeOccupation)=>g.bail?(g.bail.actif===false||!!g.bail.date_sortie&&g.bail.date_sortie<rentalDate()):!g.occupants.some(o=>o.actif&&(!o.date_sortie||o.date_sortie>=rentalDate()))
+  const groupesActifs=groupes.filter(g=>!termine(g))
+  const groupesTermines=groupes.filter(termine)
   const nbActifs = locataires.filter((l) => l.actif).length
 
   function renderGroupe(groupe: GroupeOccupation, termine = false) {
-    const principal = groupe.occupants.find((o) => o.est_principal) ?? groupe.occupants[0]
+    const principal = rentalPrincipal(groupe.occupants)
     const bail = groupe.bail
     const bien = biensMap.get(bail?.bien_id ?? principal.bien_id)
     const lot = bail?.lot_id ? lotsMap.get(bail.lot_id) : undefined
-    const annexes = bail ? (annexesByBail.get(bail.id)??[]) : []
-    const incluses=includedAnnexes(lot?.annexes??bien?.annexes);
-    const annexesTotal = annexes.reduce((sum, annexe) => sum + annexe.prix_mensuel, 0)
-    const typeOccupation = bail?.type_occupation ?? 'individuel'
-    const estGroupe = groupe.occupants.length > 1
-    const loyer = Number(bail?.loyer_hc ?? principal.loyer_hc ?? 0)
-    const charges = Number(bail?.charges ?? principal.charges ?? 0)
-    const total = loyer + charges + annexesTotal
+    const reference=termine?(bail?.date_sortie??principal.date_sortie??rentalDate()):rentalDate()
+    const amounts=leaseAmounts(bail??principal,affectations.filter(a=>a.bail_id===(bail?.id??principal.bail_id)),reference)
+    const annexes=amounts.annexes.map(a=>({lot:lotsMap.get(a.lot_id),lot_id:a.lot_id,prix_mensuel:Number(a.prix_mensuel??0)}))
+    const incluses=includedAnnexes(lot?.annexes??bien?.annexes)
+    const typeOccupation=bail?.type_occupation??'individuel',estGroupe=groupe.occupants.length>1,loyer=amounts.loyer,charges=amounts.charges,total=amounts.total
     const cautionPayee = bail ? bail.caution_payee : principal.caution_payee
     const dateSource = bail?.date_entree ?? principal.date_entree
     const dateEntree = new Date(`${dateSource}T00:00:00`).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })
@@ -92,7 +88,7 @@ export default async function LocatairesPage() {
           <div className="flex justify-between gap-3"><span>Charges</span><span>{charges.toLocaleString('fr-FR')} € / mois</span></div>
           {annexes.map(annexe => <div key={annexe.lot_id} className="flex justify-between gap-3"><span>{annexe.lot?.nom_personnalise?.trim() || lotLabel(annexe.lot) || 'Lot annexe'}</span><span className="shrink-0">{annexe.prix_mensuel.toLocaleString('fr-FR')} € / mois</span></div>)}
         </div>
-        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between text-sm mt-3 pt-3 border-t border-slate-50 pointer-events-none"><div><span className="font-semibold text-slate-900">{total.toLocaleString('fr-FR')} € / mois</span><span className="block text-[11px] leading-4 text-slate-400 font-normal">Total mensuel{annexes.length > 0 ? ' · charges et annexes comprises' : ' · charges comprises'}</span>{estGroupe && typeOccupation === 'bail_commun' && <span className="block text-[11px] leading-4 text-slate-400 font-normal">Loyer du bail — compté une seule fois</span>}</div>{termine?<div className="grid grid-cols-2 gap-x-5 text-xs leading-4 text-slate-400 sm:text-right sm:shrink-0"><span><span className="block text-[10px] uppercase tracking-wide">Entrée</span>{dateEntree}</span><span><span className="block text-[10px] uppercase tracking-wide">Sortie</span>{dateSortie??'À renseigner'}</span></div>:<span className="text-xs leading-4 text-slate-400 sm:text-right sm:shrink-0">Entrée le {dateEntree}</span>}</div>
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between text-sm mt-3 pt-3 border-t border-slate-50 pointer-events-none"><div><span className="font-semibold text-slate-900">{total.toLocaleString('fr-FR')} € / mois</span><span className="block text-[11px] leading-4 text-slate-400 font-normal">{termine?'Dernier total mensuel':'Total mensuel'}{annexes.length > 0 ? ' · charges et annexes comprises' : ' · charges comprises'}</span>{estGroupe && typeOccupation === 'bail_commun' && <span className="block text-[11px] leading-4 text-slate-400 font-normal">Loyer du bail — compté une seule fois</span>}</div>{termine?<div className="grid grid-cols-2 gap-x-5 text-xs leading-4 text-slate-400 sm:text-right sm:shrink-0"><span><span className="block text-[10px] uppercase tracking-wide">Entrée</span>{dateEntree}</span><span><span className="block text-[10px] uppercase tracking-wide">Sortie</span>{dateSortie??'À renseigner'}</span></div>:<span className="text-xs leading-4 text-slate-400 sm:text-right sm:shrink-0">Entrée le {dateEntree}</span>}</div>
         <div className="relative z-10 mt-3 flex justify-end gap-2"><Link href={ficheHref} className="inline-flex items-center border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Consulter</Link><Link href={modifierHref} className="inline-flex items-center border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Modifier</Link><DeleteLocataireButton id={principal.id} nom={estGroupe ? titre : principal.nom} /></div>
       </div>
     )
