@@ -1,3 +1,4 @@
+import {rentAt,withRentAt} from '@/lib/rentHistory'
 import OrderedCards from '@/components/OrderedCards'
 import {getCardOrders} from '@/lib/cardOrderServer'
 import {uniqueAnnexes,includedAnnexes} from '@/lib/annexeRows'
@@ -22,14 +23,14 @@ export default async function LocatairesPage() {
   const [{ data: locatairesData },{ data: biensData },{ data: bauxData },{ data: lotsData },{ data: affectationsData }] = await Promise.all([
     supabase.from('locataires').select('*').order('created_at', { ascending: false }),
     supabase.from('biens').select('id, nom, adresse, ville, type, annexes'),
-    supabase.from('baux').select('id, bien_id, lot_id, type_occupation, date_entree, date_sortie, loyer_hc, charges, caution_payee, actif, created_at'),
+    supabase.from('baux').select('*'),
     supabase.from('lots').select('id, bien_id, numero_lot, nom_personnalise, type, specificite, annexes'),
     supabase.from('affectations_lots_baux').select('bail_id, lot_id, date_debut, date_fin, prix_mensuel').is('date_fin',null)
   ])
 
   const locataires: Locataire[] = locatairesData ?? []
   const biens: Bien[] = biensData ?? []
-  const baux: Bail[] = bauxData ?? []
+  const baux: Bail[] = (bauxData ?? []).map(b=>withRentAt(b))
   const lots: Lot[] = lotsData ?? []
   const affectations: Affectation[] = affectationsData ?? []
   const biensMap = new Map(biens.map((b) => [b.id, b]))
