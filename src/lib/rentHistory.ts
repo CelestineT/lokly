@@ -1,5 +1,5 @@
 export type RentRevision = {date_effet:string;loyer_hc:number;charges:number;motif?:string;enregistre_le?:string}
-export type RentSource = {loyer_hc?:number|string|null;charges?:number|string|null;historique_loyers?:unknown}
+export type RentSource = {loyer_hc?:number|string|null;charges?:number|string|null;historique_loyers?:unknown;corrections_loyers?:unknown}
 /** Calendar months, never UTC midnight: monthly billing has no daily proration. */
 export function localMonth(date=new Date()){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`}
 export function rentRevisions(source:RentSource):RentRevision[]{
