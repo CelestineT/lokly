@@ -1,0 +1,3 @@
+/** Labels of the selected charge items, without changing their stored identifiers. */
+const labels:Record<string,string>={eau_froide:'Eau froide',eau_chaude:'Eau chaude',chauffage:'Chauffage',chauffage_collectif:'Chauffage collectif',electricite:'Électricité',electricite_communs:'Électricité des parties communes',entretien_communs:'Entretien des parties communes',ascenseur:'Ascenseur',teom:'Taxe d’enlèvement des ordures ménagères (TEOM)',gardiennage:'Gardiennage / concierge',espaces_verts:'Entretien des espaces verts',autre:'Autre'}
+export function chargeDetails(values:unknown):string[]{return Array.isArray(values)?Array.from(new Set(values.filter((value):value is string=>typeof value==='string').map(value=>labels[value]).filter(Boolean))):[]}

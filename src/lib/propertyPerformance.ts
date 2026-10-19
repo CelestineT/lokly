@@ -18,7 +18,7 @@ function vacancy(bien:PerformanceProperty,lotId:string|null,baux:PerformanceLeas
  return {available:end-begin+1,empty:Math.max(0,end-begin+1-occupied)}
 }
 export function propertyPerformance(bien:PerformanceProperty,data:PerformanceData,to=performanceDate()){
- const from=`${to.slice(0,4)}-01-01`,month=to.slice(0,7),baux=[...new Map(data.baux.filter(b=>b.bien_id===bien.id).map(b=>[b.id,b])).values()],lots=data.lots.filter(l=>l.bien_id===bien.id),locataires=data.locataires.filter(l=>l.bien_id===bien.id||!!l.bail_id&&baux.some(b=>b.id===l.bail_id)),tenantIds=new Set(locataires.map(l=>l.id))
+ const from=`${to.slice(0,4)}-01-01`,month=to.slice(0,7),baux=[...new Map(data.baux.filter(b=>b.bien_id===bien.id&&data.locataires.some(t=>t.bail_id===b.id)).map(b=>[b.id,b])).values()],lots=data.lots.filter(l=>l.bien_id===bien.id),locataires=data.locataires.filter(l=>l.bien_id===bien.id||!!l.bail_id&&baux.some(b=>b.id===l.bail_id)),tenantIds=new Set(locataires.map(l=>l.id))
  const paiements=data.paiements.filter(p=>p.bien_id===bien.id||!p.bien_id&&tenantIds.has(p.locataire_id)),depenses=data.depenses.filter(d=>d.bien_id===bien.id),fins=data.financements.filter(f=>f.bien_id===bien.id),fin=fins[0]??null
  const totals=rentalTotals({baux:data.baux,locataires:data.locataires as RentalSource[],affectations:data.affectations??[],bienId:bien.id,at:to})
  const rentRows=totals.rows.map(r=>({...r,label:lots.find(l=>l.id===r.lot_id)?.nom_personnalise?.trim()||lots.find(l=>l.id===r.lot_id)?.numero_lot||r.label})),loyerMensuel=totals.principalHC,chargesMensuelles=totals.charges,loyerAnnuel=loyerMensuel*12

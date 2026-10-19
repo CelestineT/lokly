@@ -11,12 +11,13 @@ export function leaseAmounts<T extends RentalAssignment>(source:RentSource,rows:
  const rent=rentAt(source,at.slice(0,7)),annexes=annexesAt(rows,at),annexesTotal=amount(annexes.reduce((s,a)=>s+amount(a.prix_mensuel),0)),loyer=amount(rent.loyer_hc),charges=amount(rent.charges)
  return {loyer,charges,annexes,annexesTotal,total:amount(loyer+charges+annexesTotal)}
 }
-/** One contract per lease; legacy records without a matching lease remain visible. */
+/** A lease without any surviving occupant is not an ongoing rental. Legacy tenant records without a matching lease remain supported. */
 export function rentalTotals({baux,locataires=[],affectations=[],bienId,lotId,at=rentalDate()}:{baux:RentalSource[];locataires?:RentalSource[];affectations?:RentalAssignment[];bienId?:string;lotId?:string;at?:string}){
- const leases=new Map(baux.map(b=>[b.id,b])),contracts:RentalSource[]=[...leases.values()]
+ const members=new Map<string,RentalSource[]>();for(const tenant of locataires){if(tenant.bail_id)members.set(tenant.bail_id,[...(members.get(tenant.bail_id)??[]),tenant])}
+ const leases=new Map(baux.map(b=>[b.id,b])),contracts:RentalSource[]=[...leases.values()].filter(b=>members.has(b.id))
  const fallback=new Map<string,RentalSource[]>();for(const tenant of locataires){if(tenant.bail_id&&leases.has(tenant.bail_id))continue;const key=tenant.bail_id?`bail:${tenant.bail_id}`:`loc:${tenant.id}`;fallback.set(key,[...(fallback.get(key)??[]),tenant])}
  for(const [id,group]of fallback){const principal=rentalPrincipal(group,at);contracts.push({...principal,id,bail_id:principal.bail_id??null})}
- const active=contracts.filter(b=>rentalIsCurrent(b,at)&&(!bienId||b.bien_id===bienId))
+ const active=contracts.filter(b=>rentalIsCurrent(b,at)&&(!leases.has(b.id)||(members.get(b.id)??[]).some(t=>rentalIsCurrent(t,at)))&&(!bienId||b.bien_id===bienId))
  const rows=active.filter(b=>!lotId||b.lot_id===lotId).map(b=>{const member=locataires.find(t=>t.bail_id===b.id&&t.est_principal)??locataires.find(t=>t.bail_id===b.id);return{id:b.id,bail_id:b.bail_id??(leases.has(b.id)?b.id:null),bien_id:b.bien_id??null,lot_id:b.lot_id??null,label:member?.nom??b.nom??'Bail',...rentAt(b,at.slice(0,7))}})
  const activeLeaseIds=new Set(active.flatMap(b=>{const id=b.bail_id??(leases.has(b.id)?b.id:null);return id?[id]:[]})),principalLots=new Set(active.map(b=>b.lot_id).filter(Boolean))
  const annexes=annexesAt(affectations.filter(a=>activeLeaseIds.has(a.bail_id)&&(!lotId||a.lot_id===lotId)&&!principalLots.has(a.lot_id)),at)
