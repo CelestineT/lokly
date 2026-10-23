@@ -1,8 +1,8 @@
-# Ekolocs — Valeur nette et vacance
+# Ekolocs — Capital récupérable et vacance
 
-## Valeur nette
+## Capital récupérable
 
-La vignette porte le titre **Valeur nette** et la mention **Estimation à la revente**. Son infobulle précise : « Valeur estimée de votre bien après remboursement des crédits restants, avant frais de vente et fiscalité. Votre apport initial est déjà compris dans cette valeur. »
+La vignette porte le titre **Capital récupérable** et la mention **Avant frais et fiscalité**. Son infobulle précise : « Somme estimée que vous pourriez récupérer en vendant ce bien à sa valeur actuelle, après remboursement des crédits restants, avant frais de vente et fiscalité. Votre apport initial est compris dans cette somme. »
 
 Calcul : dernière valeur estimée renseignée − somme des capitaux restant dus estimés à la date de calcul. L’estimation du crédit utilise les paramètres de financement existants, y compris le différé. Elle ne remplace pas un décompte de remboursement fourni par la banque. Une valeur négative est conservée. Les frais et la fiscalité ne sont pas soustraits.
 

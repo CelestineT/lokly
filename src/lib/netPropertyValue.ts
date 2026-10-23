@@ -2,7 +2,7 @@ import {remainingLoanBalance} from './investmentPerformance'
 import {calendarDay} from './rentalVacancy'
 import {rentalDate} from './rentalTotals'
 import {validateDeferral,type LoanDeferral} from './loanDeferral'
-export const NET_VALUE_HELP='Valeur estimée de votre bien après remboursement des crédits restants, avant frais de vente et fiscalité. Votre apport initial est déjà compris dans cette valeur.'
+export const NET_VALUE_HELP='Somme estimée que vous pourriez récupérer en vendant ce bien à sa valeur actuelle, après remboursement des crédits restants, avant frais de vente et fiscalité. Votre apport initial est compris dans cette somme.'
 export type NetValue={value:number|null;remainingDebt:number|null;reason:string|null;at:string;valuationDate:string|null}
 export function netPropertyValue(bien:{valeur_actuelle?:number|null;valeur_actuelle_date?:string|null},loans:LoanDeferral[],at=rentalDate()):NetValue{
  const result=(value:number|null,remainingDebt:number|null,reason:string|null):NetValue=>({value,remainingDebt,reason,at,valuationDate:bien.valeur_actuelle_date??null})
