@@ -36,3 +36,18 @@ export function simulatePrepayment(input:PrepaymentInput):PrepaymentResult{
  const savings=(scenario:RepaymentSchedule):ScenarioSavings=>{const interestSaved=euros(cents(baseline.interest)-cents(scenario.interest)),insuranceSaved=insuranceMonthly===null?null:euros(cents(baseline.insurance!)-cents(scenario.insurance!));return{monthsSaved:baseline.months-scenario.months,interestSaved,insuranceSaved,netSaved:fees===null?null:euros(cents(interestSaved)+cents(insuranceSaved??0)-cents(fees)),monthlyRelief:euros(cents(monthlyPayment)-cents(scenario.monthlyPayment)+(scenario.months===0?cents(insuranceMonthly??0):0))}}
  return{input:{...input},remainingCapital,cashNeeded:fees===null?null:euros(cents(repayment)+cents(fees)),baseline,shorter,lower,shorterSavings:savings(shorter),lowerSavings:savings(lower)}
 }
+
+export type PaymentIncreaseInput=Omit<PrepaymentInput,'repayment'>&{newMonthlyPayment:number}
+export type PaymentIncreaseResult={input:PaymentIncreaseInput;baseline:RepaymentSchedule;increased:RepaymentSchedule;monthsSaved:number;interestSaved:number;insuranceSaved:number|null;netSaved:number|null;monthlyEffort:number}
+/** Permanent increase from the month following the balance snapshot; no upfront principal repayment. */
+export function simulatePaymentIncrease(input:PaymentIncreaseInput):PaymentIncreaseResult{
+ const {capital,annualRate,monthlyPayment,newMonthlyPayment,month,fees,insuranceMonthly}=input
+ money(capital,'Capital restant dû',false);money(monthlyPayment,'Mensualité actuelle',false);money(newMonthlyPayment,'Nouvelle mensualité',false)
+ if(newMonthlyPayment<=monthlyPayment)throw Error('La nouvelle mensualité doit être supérieure à la mensualité actuelle.')
+ if(!Number.isFinite(annualRate)||annualRate<0||annualRate>100||Math.abs(annualRate*1000000-Math.round(annualRate*1000000))>1e-5)throw Error('Saisissez un taux nominal annuel compris entre 0 et 100 %, avec six décimales maximum.')
+ if(!validLoanMonth(month))throw Error('Choisissez un mois valide.')
+ if(fees!==null)money(fees,'Frais de modulation');if(insuranceMonthly!==null)money(insuranceMonthly,'Assurance mensuelle')
+ const baseline=schedule(capital,annualRate,monthlyPayment,month,insuranceMonthly),increased=schedule(capital,annualRate,newMonthlyPayment,month,insuranceMonthly)
+ const interestSaved=euros(cents(baseline.interest)-cents(increased.interest)),insuranceSaved=insuranceMonthly===null?null:euros(cents(baseline.insurance!)-cents(increased.insurance!))
+ return{input:{...input},baseline,increased,monthsSaved:baseline.months-increased.months,interestSaved,insuranceSaved,netSaved:fees===null?null:euros(cents(interestSaved)+cents(insuranceSaved??0)-cents(fees)),monthlyEffort:euros(cents(newMonthlyPayment)-cents(monthlyPayment))}
+}
