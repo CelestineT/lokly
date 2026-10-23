@@ -51,3 +51,30 @@ export function simulatePaymentIncrease(input:PaymentIncreaseInput):PaymentIncre
  const interestSaved=euros(cents(baseline.interest)-cents(increased.interest)),insuranceSaved=insuranceMonthly===null?null:euros(cents(baseline.insurance!)-cents(increased.insurance!))
  return{input:{...input},baseline,increased,monthsSaved:baseline.months-increased.months,interestSaved,insuranceSaved,netSaved:fees===null?null:euros(cents(interestSaved)+cents(insuranceSaved??0)-cents(fees)),monthlyEffort:euros(cents(newMonthlyPayment)-cents(monthlyPayment))}
 }
+
+export type SuccessiveInput=PrepaymentInput&{firstMonth:string;frequency:1|3|6|12}
+export type SuccessiveRow=ScheduleRow&{extraPayment:number;fees:number|null}
+export type SuccessiveResult={input:SuccessiveInput;baseline:RepaymentSchedule;successive:Omit<RepaymentSchedule,'rows'>&{rows:SuccessiveRow[]};payments:{month:string;amount:number;fees:number|null}[];totalExtra:number;totalFees:number|null;cashNeeded:number|null;monthsSaved:number;interestSaved:number;insuranceSaved:number|null;netSaved:number|null}
+/** Recurring lump sums after the normal instalment; stop and cap automatically at settlement. */
+export function simulateSuccessivePrepayments(input:SuccessiveInput):SuccessiveResult{
+ const {capital,annualRate,monthlyPayment,repayment,month,fees,insuranceMonthly,firstMonth,frequency}=input
+ money(capital,'Capital restant dû',false);money(monthlyPayment,'Mensualité',false);money(repayment,'Montant par versement',false)
+ if(!Number.isFinite(annualRate)||annualRate<0||annualRate>100||Math.abs(annualRate*1000000-Math.round(annualRate*1000000))>1e-5)throw Error('Saisissez un taux nominal annuel compris entre 0 et 100 %, avec six décimales maximum.')
+ if(!validLoanMonth(month)||!validLoanMonth(firstMonth)||firstMonth<=month)throw Error('Le premier versement doit intervenir après le mois de la situation de départ.')
+ if(![1,3,6,12].includes(frequency))throw Error('Choisissez une fréquence mensuelle, trimestrielle, semestrielle ou annuelle.')
+ if(fees!==null)money(fees,'Frais par versement');if(insuranceMonthly!==null)money(insuranceMonthly,'Assurance mensuelle')
+ const baseline=schedule(capital,annualRate,monthlyPayment,month,insuranceMonthly),rows:SuccessiveRow[]=[],payments:SuccessiveResult['payments']=[]
+ let balance=cents(capital),interestTotal=0,totalExtra=0
+ const [y,m]=month.split('-').map(Number),[fy,fm]=firstMonth.split('-').map(Number),firstOffset=(fy-y)*12+fm-m,rateUnits=BigInt(Math.round(annualRate*1000000))
+ for(let index=1;balance>0&&index<=MAX_MONTHS;index++){
+  const interest=Number((BigInt(balance)*rateUnits+BigInt(600000000))/BigInt(1200000000)),due=balance+interest,payment=Math.min(cents(monthlyPayment),due),principal=payment-interest
+  const extra=index>=firstOffset&&(index-firstOffset)%frequency===0?Math.min(cents(repayment),due-payment):0,remaining=due-payment-extra,key=shiftLoanMonth(month,index),rowFees=extra>0?fees:0
+  rows.push({month:key,opening:euros(balance),interest:euros(interest),principal:euros(principal),payment:euros(payment),extraPayment:euros(extra),fees:rowFees,remaining:euros(remaining)})
+  if(extra>0)payments.push({month:key,amount:euros(extra),fees})
+  interestTotal+=interest;totalExtra+=extra;balance=remaining
+ }
+ if(balance>0)throw Error('Le remboursement dépasserait 50 ans. Vérifiez les paramètres.')
+ const successive={months:rows.length,endMonth:rows.at(-1)!.month,monthlyPayment,lastPayment:rows.at(-1)!.payment,interest:euros(interestTotal),insurance:insuranceMonthly===null?null:euros(cents(insuranceMonthly)*rows.length),rows}
+ const totalFees=payments.length===0?0:fees===null?null:euros(cents(fees)*payments.length),interestSaved=euros(cents(baseline.interest)-interestTotal),insuranceSaved=insuranceMonthly===null?null:euros(cents(baseline.insurance!)-cents(successive.insurance!))
+ return{input:{...input},baseline,successive,payments,totalExtra:euros(totalExtra),totalFees,cashNeeded:totalFees===null?null:euros(totalExtra+cents(totalFees)),monthsSaved:baseline.months-successive.months,interestSaved,insuranceSaved,netSaved:totalFees===null?null:euros(cents(interestSaved)+cents(insuranceSaved??0)-cents(totalFees))}
+}
