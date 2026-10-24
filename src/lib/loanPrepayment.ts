@@ -78,3 +78,25 @@ export function simulateSuccessivePrepayments(input:SuccessiveInput):SuccessiveR
  const totalFees=payments.length===0?0:fees===null?null:euros(cents(fees)*payments.length),interestSaved=euros(cents(baseline.interest)-interestTotal),insuranceSaved=insuranceMonthly===null?null:euros(cents(baseline.insurance!)-cents(successive.insurance!))
  return{input:{...input},baseline,successive,payments,totalExtra:euros(totalExtra),totalFees,cashNeeded:totalFees===null?null:euros(totalExtra+cents(totalFees)),monthsSaved:baseline.months-successive.months,interestSaved,insuranceSaved,netSaved:totalFees===null?null:euros(cents(interestSaved)+cents(insuranceSaved??0)-cents(totalFees))}
 }
+
+export type TargetDateInput=Omit<PrepaymentInput,'repayment'>&{targetMonth:string}
+export type TargetDateResult={input:TargetDateInput;targetMonths:number;baseline:RepaymentSchedule;target:RepaymentSchedule;monthlyDifference:number;monthsSaved:number;interestSaved:number;insuranceSaved:number|null;netSaved:number|null}
+/** Lowest whole-cent fixed instalment which settles the loan by the requested month.
+ * Uses the same monthly rounded-interest ledger as the other scenarios, rather than
+ * a rounded theoretical PMT which could leave a balance after the target date. */
+export function simulateTargetDate(input:TargetDateInput):TargetDateResult{
+ const {capital,annualRate,monthlyPayment,month,targetMonth,fees,insuranceMonthly}=input
+ money(capital,'Capital restant dû',false);money(monthlyPayment,'Mensualité actuelle',false)
+ if(!Number.isFinite(annualRate)||annualRate<0||annualRate>100||Math.abs(annualRate*1000000-Math.round(annualRate*1000000))>1e-5)throw Error('Saisissez un taux nominal annuel compris entre 0 et 100 %, avec six décimales maximum.')
+ if(!validLoanMonth(month)||!validLoanMonth(targetMonth))throw Error('Choisissez un mois de départ et une date de fin valides.')
+ const[y,m]=month.split('-').map(Number),[ty,tm]=targetMonth.split('-').map(Number),targetMonths=(ty-y)*12+tm-m
+ if(targetMonths<1||targetMonths>MAX_MONTHS)throw Error('La date de fin doit se situer entre le mois suivant la situation de départ et 50 ans après celle-ci.')
+ if(fees!==null)money(fees,'Frais de modification');if(insuranceMonthly!==null)money(insuranceMonthly,'Assurance mensuelle')
+ const baseline=schedule(capital,annualRate,monthlyPayment,month,insuranceMonthly),rateUnits=BigInt(Math.round(annualRate*1000000))
+ function settlesBy(instalment:number){let balance=cents(capital);for(let index=0;balance>0&&index<targetMonths;index++){const interest=Number((BigInt(balance)*rateUnits+BigInt(600000000))/BigInt(1200000000));if(instalment<=interest)return false;balance=Math.max(0,balance+interest-instalment)}return balance===0}
+ let low=1,high=cents(MAX_EUROS)
+ if(!settlesBy(high))throw Error('La mensualité nécessaire dépasse la limite de 100 millions d’euros. Choisissez une date de fin plus éloignée.')
+ while(low<high){const mid=Math.floor((low+high)/2);if(settlesBy(mid))high=mid;else low=mid+1}
+ const target=schedule(capital,annualRate,euros(low),month,insuranceMonthly),interestSaved=euros(cents(baseline.interest)-cents(target.interest)),insuranceSaved=insuranceMonthly===null?null:euros(cents(baseline.insurance!)-cents(target.insurance!))
+ return{input:{...input},targetMonths,baseline,target,monthlyDifference:euros(low-cents(monthlyPayment)),monthsSaved:baseline.months-target.months,interestSaved,insuranceSaved,netSaved:fees===null?null:euros(cents(interestSaved)+cents(insuranceSaved??0)-cents(fees))}
+}
