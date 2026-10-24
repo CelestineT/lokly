@@ -129,3 +129,19 @@ export function simulatePaymentReduction(input:PaymentReductionInput):PaymentRed
  const baseline=schedule(capital,annualRate,monthlyPayment,month,insuranceMonthly),reduced=schedule(capital,annualRate,newMonthlyPayment,month,insuranceMonthly),extraInterest=euros(cents(reduced.interest)-cents(baseline.interest)),extraInsurance=insuranceMonthly===null?null:euros(cents(reduced.insurance!)-cents(baseline.insurance!))
  return{input:{...input},baseline,reduced,monthlyRelief:euros(cents(monthlyPayment)-cents(newMonthlyPayment)),monthsAdded:reduced.months-baseline.months,extraInterest,extraInsurance,extraCost:fees===null?null:euros(cents(extraInterest)+cents(extraInsurance??0)+cents(fees))}
 }
+
+export type RateRenegotiationInput=Omit<PrepaymentInput,'repayment'>&{newAnnualRate:number}
+export type RateRenegotiationResult={input:RateRenegotiationInput;baseline:RepaymentSchedule;shorter:RepaymentSchedule;lower:RepaymentSchedule;shorterSavings:ScenarioSavings;lowerSavings:ScenarioSavings}
+/** Lower fixed nominal rate, unchanged principal; fees paid separately, insurance unchanged. */
+export function simulateRateRenegotiation(input:RateRenegotiationInput):RateRenegotiationResult{
+ const {capital,annualRate,newAnnualRate,monthlyPayment,month,fees,insuranceMonthly}=input
+ money(capital,'Capital restant dû',false);money(monthlyPayment,'Mensualité actuelle',false)
+ for(const rate of [annualRate,newAnnualRate])if(!Number.isFinite(rate)||rate<0||rate>100||Math.abs(rate*1000000-Math.round(rate*1000000))>1e-5)throw Error('Saisissez des taux nominaux annuels compris entre 0 et 100 %, avec six décimales maximum.')
+ if(newAnnualRate>=annualRate)throw Error('Le nouveau taux doit être inférieur au taux actuel. Un crédit déjà à taux zéro ne peut pas bénéficier de cette simulation de baisse.')
+ if(!validLoanMonth(month))throw Error('Choisissez un mois valide.')
+ if(fees!==null)money(fees,'Frais de renégociation');if(insuranceMonthly!==null)money(insuranceMonthly,'Assurance mensuelle')
+ const baseline=schedule(capital,annualRate,monthlyPayment,month,insuranceMonthly),shorter=schedule(capital,newAnnualRate,monthlyPayment,month,insuranceMonthly)
+ const lower=simulateTargetDate({...input,annualRate:newAnnualRate,targetMonth:baseline.endMonth}).target
+ const savings=(plan:RepaymentSchedule):ScenarioSavings=>{const interestSaved=euros(cents(baseline.interest)-cents(plan.interest)),insuranceSaved=insuranceMonthly===null?null:euros(cents(baseline.insurance!)-cents(plan.insurance!));return{monthsSaved:baseline.months-plan.months,interestSaved,insuranceSaved,netSaved:fees===null?null:euros(cents(interestSaved)+cents(insuranceSaved??0)-cents(fees)),monthlyRelief:euros(cents(monthlyPayment)-cents(plan.monthlyPayment))}}
+ return{input:{...input},baseline,shorter,lower,shorterSavings:savings(shorter),lowerSavings:savings(lower)}
+}
