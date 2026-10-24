@@ -100,3 +100,18 @@ export function simulateTargetDate(input:TargetDateInput):TargetDateResult{
  const target=schedule(capital,annualRate,euros(low),month,insuranceMonthly),interestSaved=euros(cents(baseline.interest)-cents(target.interest)),insuranceSaved=insuranceMonthly===null?null:euros(cents(baseline.insurance!)-cents(target.insurance!))
  return{input:{...input},targetMonths,baseline,target,monthlyDifference:euros(low-cents(monthlyPayment)),monthsSaved:baseline.months-target.months,interestSaved,insuranceSaved,netSaved:fees===null?null:euros(cents(interestSaved)+cents(insuranceSaved??0)-cents(fees))}
 }
+
+export type CombinedInput=PrepaymentInput&{newMonthlyPayment:number|null;modulationFees:number|null}
+export type CombinedResult={input:CombinedInput;baseline:RepaymentSchedule;repaymentOnly:RepaymentSchedule;combined:RepaymentSchedule;remainingCapital:number;totalFees:number|null;cashNeeded:number|null;monthlyEffort:number;monthsSaved:number;interestSaved:number;insuranceSaved:number|null;netSaved:number|null;additionalMonthsSaved:number;additionalInterestSaved:number;additionalNetSaved:number|null}
+/** Lump sum after the selected month's instalment, then higher monthly instalments.
+ * Fees are separated so the repayment-only comparison never includes modulation fees. */
+export function simulateCombined(input:CombinedInput):CombinedResult{
+ const {newMonthlyPayment,modulationFees,monthlyPayment,annualRate,month,insuranceMonthly,fees,repayment}=input
+ if(newMonthlyPayment!==null)money(newMonthlyPayment,'Nouvelle mensualité',false)
+ if(modulationFees!==null)money(modulationFees,'Frais de hausse de mensualité')
+ const reference=simulatePrepayment(input)
+ if(reference.remainingCapital>0&&(newMonthlyPayment===null||newMonthlyPayment<=monthlyPayment))throw Error('La nouvelle mensualité doit être supérieure à la mensualité actuelle.')
+ const combined=schedule(reference.remainingCapital,annualRate,newMonthlyPayment??monthlyPayment,month,insuranceMonthly),appliedModulationFees=combined.months===0?0:modulationFees
+ const totalFees=fees===null||appliedModulationFees===null?null:euros(cents(fees)+cents(appliedModulationFees)),interestSaved=euros(cents(reference.baseline.interest)-cents(combined.interest)),insuranceSaved=insuranceMonthly===null?null:euros(cents(reference.baseline.insurance!)-cents(combined.insurance!)),additionalInterestSaved=euros(cents(reference.shorter.interest)-cents(combined.interest)),additionalInsuranceSaved=insuranceMonthly===null?0:euros(cents(reference.shorter.insurance!)-cents(combined.insurance!))
+ return{input:{...input},baseline:reference.baseline,repaymentOnly:reference.shorter,combined,remainingCapital:reference.remainingCapital,totalFees,cashNeeded:totalFees===null?null:euros(cents(repayment)+cents(totalFees)),monthlyEffort:combined.months===0?0:euros(cents(newMonthlyPayment!)-cents(monthlyPayment)),monthsSaved:reference.baseline.months-combined.months,interestSaved,insuranceSaved,netSaved:totalFees===null?null:euros(cents(interestSaved)+cents(insuranceSaved??0)-cents(totalFees)),additionalMonthsSaved:reference.shorter.months-combined.months,additionalInterestSaved,additionalNetSaved:appliedModulationFees===null?null:euros(cents(additionalInterestSaved)+cents(additionalInsuranceSaved)-cents(appliedModulationFees))}
+}
