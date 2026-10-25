@@ -1,6 +1,7 @@
 'use server'
 import {createClient} from '@/lib/supabase/server'
 import {revalidatePath} from 'next/cache'
+import {rentalDate} from '@/lib/rentalTotals'
 
 export async function enregistrerValeurActuelle(bienId:string,formData:FormData){
  const s=await createClient();
@@ -12,6 +13,7 @@ export async function enregistrerValeurActuelle(bienId:string,formData:FormData)
  const valeur=Number(raw);
  if(!Number.isFinite(valeur)||valeur<=0)return{error:'La valeur actuelle doit être supérieure à 0.'};
  if(!date)return{error:"Renseignez la date d'estimation."};
+ const parsed=new Date(`${date}T12:00:00Z`);if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(parsed.getTime())||parsed.toISOString().slice(0,10)!==date||date>rentalDate())return{error:'Renseignez une date d’estimation valide, au plus tard aujourd’hui.'};
  const{error}=await s.from('biens').update({valeur_actuelle:valeur,valeur_actuelle_date:date}).eq('id',bienId).eq('proprietaire_id',user.id);
  if(error)return{error:error.message};
  revalidatePath('/dashboard');revalidatePath('/dashboard/biens');revalidatePath(`/dashboard/biens/${bienId}`);revalidatePath('/dashboard/rentabilite');
