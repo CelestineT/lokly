@@ -6,7 +6,7 @@ export const rentalDate=(date=new Date())=>new Intl.DateTimeFormat('en-CA',{time
 const amount=(v:unknown)=>Math.round(Number(v??0)*100)/100
 export function rentalIsCurrent(source:{actif?:boolean|null;date_entree?:string|null;date_sortie?:string|null},at=rentalDate()){return source.actif!==false&&(!source.date_entree||source.date_entree<=at)&&(!source.date_sortie||source.date_sortie>=at)}
 export function rentalPrincipal<T extends RentalSource>(group:T[],at=rentalDate()):T{const sorted=[...group].sort((a,b)=>a.id.localeCompare(b.id)),current=sorted.filter(t=>rentalIsCurrent(t,at));return current.find(t=>t.est_principal)??current[0]??sorted.find(t=>t.est_principal)??sorted[0]}
-export function annexesAt<T extends RentalAssignment>(rows:T[],at=rentalDate()):T[]{return uniqueAnnexes(rows.filter(a=>a.date_debut<=at&&(!a.date_fin||a.date_fin>=at)))}
+export function annexesAt<T extends RentalAssignment>(rows:T[],at=rentalDate()):T[]{return uniqueAnnexes(rows.filter(a=>a.date_debut<=at)).filter(a=>!a.date_fin||a.date_fin>=at)}
 export function leaseAmounts<T extends RentalAssignment>(source:RentSource,rows:T[],at=rentalDate()){
  const rent=rentAt(source,at.slice(0,7)),annexes=annexesAt(rows,at),annexesTotal=amount(annexes.reduce((s,a)=>s+amount(a.prix_mensuel),0)),loyer=amount(rent.loyer_hc),charges=amount(rent.charges)
  return {loyer,charges,annexes,annexesTotal,total:amount(loyer+charges+annexesTotal)}

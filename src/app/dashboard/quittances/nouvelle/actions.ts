@@ -1,6 +1,6 @@
 'use server'
 import {rentAt,withRentAt} from '@/lib/rentHistory'
-import {uniqueAnnexes} from '@/lib/annexeRows'
+import {loadBailAnnexes} from '@/lib/loadBailAnnexes'
 import {createClient} from '@/lib/supabase/server'
 import {revalidatePath} from 'next/cache'
 export async function creerQuittance(formData:FormData){
@@ -11,7 +11,8 @@ export async function creerQuittance(formData:FormData){
  if(bailId){const{data:b}=await s.from('baux').select('*').eq('id',bailId).eq('proprietaire_id',user.id).single();if(b){const rent=rentAt(b,mois);loyer=rent.loyer_hc;charges=rent.charges}else return{error:'Impossible de charger les montants du bail.'}}
  const[y,m]=mois.split('-').map(Number);if(!y||!m)return{error:'Période de quittance invalide.'};const debut=`${mois}-01`,fin=`${mois}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`
  let detail:Array<{lot_id:string;numero_lot:string;nom_personnalise?:string;type:string;prix_mensuel:number}>=[]
- if(bailId){const{data:a,error:e}=await s.from('affectations_lots_baux').select('lot_id,date_debut,date_fin,prix_mensuel,lots(numero_lot,nom_personnalise,type)').eq('bail_id',bailId).lte('date_debut',fin).or(`date_fin.is.null,date_fin.gte.${debut}`);if(e)return{error:`Impossible de vérifier les lots rattachés : ${e.message}`};detail=uniqueAnnexes<any>(a??[]).map((x:any)=>{const l=Array.isArray(x.lots)?x.lots[0]:x.lots;return{lot_id:x.lot_id,numero_lot:l?.numero_lot??'',nom_personnalise:l?.nom_personnalise?.trim()||'',type:l?.type??'lot',prix_mensuel:Number(x.prix_mensuel??0)}})}
+ if(bailId){try{const result=await loadBailAnnexes(s,bailId,loc.bien_id,mois,user.id);detail=result.rows.map(x=>({lot_id:x.lot_id,numero_lot:x.numero_lot,nom_personnalise:x.nom_personnalise,type:x.type,prix_mensuel:x.prix_mensuel}))}catch(e){return{error:e instanceof Error?e.message:'Impossible de vérifier les lots rattachés.'}}}
+
  const lotsTotal=detail.reduce((n,l)=>n+l.prix_mensuel,0),solde=Number(formData.get('solde')??0)||0,totalMois=loyer+charges+lotsTotal,totalAffiche=totalMois+solde
  // Le solde antérieur est informatif : il apparaît sur la quittance mais ne bloque pas l'édition du mois courant.
  let occupantIds=[loc.id];if(bailId){const{data:os}=await s.from('locataires').select('id').eq('bail_id',bailId).eq('proprietaire_id',user.id);if(os?.length)occupantIds=os.map(o=>o.id)}
