@@ -12,8 +12,9 @@ export function rentalVacancy({biens,lots,baux,locataires,from,to,lotId,today=re
  if(start===null||end===null||calendarDay(to)===null||calendarDay(today)===null||start>end)return {rate:null,availableDays:0,emptyDays:0,units,issues:['Période d’observation invalide.'],from,to:endDate}
  const leases=[...new Map(baux.map(b=>[b.id,b])).values()],leaseIds=new Set(leases.map(b=>b.id)),members=new Set(locataires.map(t=>t.bail_id).filter(Boolean)),legacy=new Map<string,Tenant[]>()
  for(const t of locataires){if(t.bail_id&&leaseIds.has(t.bail_id))continue;const k=t.bail_id??t.id;legacy.set(k,[...(legacy.get(k)??[]),t])}
- // Legacy occupants on a common lease form one occupancy interval.
- for(const[id,group]of legacy){const first=group.map(t=>t.date_entree).filter((v):v is string=>!!v).sort()[0],last=group.every(t=>!!t.date_sortie)?group.map(t=>t.date_sortie!).sort().at(-1):null;leases.push({...group[0],id:`legacy:${id}`,date_entree:first,date_sortie:last,actif:group.some(t=>t.actif!==false)});members.add(`legacy:${id}`)}
+ // Without a surviving lease, use each occupant's actual dates. The union below
+ // counts couples only once but preserves gaps and different dwelling IDs.
+ for(const[id,group]of legacy)for(const t of group){const key=`legacy:${id}:${t.id}`;leases.push({...t,id:key});members.add(key)}
  const overlaps=(b:Lease,begin:number)=>{const s=calendarDay(b.date_entree),e=b.date_sortie?calendarDay(b.date_sortie):end;return s===null||e===null||e<s||s<=end&&e>=begin}
  for(const bien of [...new Map(biens.map(b=>[b.id,b])).values()]){
   const homes=[...new Map(lots.filter(l=>l.bien_id===bien.id&&HOMES.has(l.type)).map(l=>[l.id,l])).values()]
