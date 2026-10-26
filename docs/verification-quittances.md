@@ -24,3 +24,6 @@ La suppression d'une quittance efface ses instantanés privés et montants publi
 6. Tester un code aléatoire et un code malformé : aucun document affiché. Vérifier aussi l'accès croisé entre deux propriétaires : émission refusée.
 
 Le QR aide à comparer les informations d'origine ; il ne certifie pas automatiquement les pixels ou tous les champs d'un PDF modifié, ni l'identité de la personne qui le présente. Aucune signature cryptographique certifiée ni abonnement externe n'est ajouté. Le cachet décoratif n'est pas inclus dans cette modification.
+
+## Domaine prévu
+Le domaine cible demandé est `https://app.ecoloc.fr`, avec la page française `/verifier` (sans accent dans l’adresse). Dès que ce sous-domaine est raccordé à l’application et son certificat HTTPS actif, définir `QUITTANCE_VERIFICATION_ORIGIN=https://app.ecoloc.fr` dans l’environnement Vercel concerné puis redéployer. Les nouveaux PDF utiliseront automatiquement cette adresse, affichée et encodée dans le QR. Jusque-là, garder la recette fonctionnelle ; ne pas afficher une adresse différente de celle encodée. Conserver l’ancien domaine accessible aux anciens QR. Aucune nouvelle migration SQL n’est nécessaire pour ce changement de domaine ou l’ordre des blocs.

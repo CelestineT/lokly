@@ -44,25 +44,26 @@ export async function generateQuittancePdf(p:QuittancePdfData):Promise<Uint8Arra
  // Keep payment mode and the glossary on one baseline, before the final blocks.
  const bh=76,bw=(cw-gap)/2,sx=margin+bw+gap
  let bottom=54,blockTop=bottom+bh
- if(y<blockTop+(p.verification?84:16)){newPage();if(p.verification){blockTop=y-94;bottom=blockTop-bh}}
+ if(y<blockTop+(p.verification?84:16))newPage()
+ if(p.verification){blockTop=y-14;bottom=blockTop-bh}
  const mode=p.modePaiement||'À renseigner',glossary='* HC : Hors Charges et CC : Charges comprises',glossarySize=5.8,glossaryX=width-margin-12-regular.widthOfTextAtSize(glossary,glossarySize)
  text('MODE DE PAIEMENT',margin,y,7.5,bold);text(mode,margin+104,y,8);text(glossary,glossaryX,y,glossarySize)
 
- if(p.verification){
-  const verify=p.verification,qr=await pdf.embedPng(Buffer.from(verify.qrDataUrl.split('base64,')[1],'base64')),qrSize=66,qrX=width-margin-qrSize,qrY=y-78
-  page.drawImage(qr,{x:qrX,y:qrY,width:qrSize,height:qrSize})
-  text('VÉRIFIER CE DOCUMENT',margin, y-24,8,bold)
-  text('Scannez ce QR code et comparez la référence,',margin,y-38,7.5)
-  text('les dates et les montants avec la version enregistrée.',margin,y-49,7.5)
-  text(`Référence : ${verify.reference}`,margin,y-63,7.5)
-  text(new URL(verify.url).origin+'/verifier',margin,y-75,6.5,regular,blue)
-  page.node.addAnnot(pdf.context.register(pdf.context.obj({Type:'Annot',Subtype:'Link',Rect:[qrX,qrY,qrX+qrSize,qrY+qrSize],Border:[0,0,0],A:{S:'URI',URI:PDFString.of(verify.url)}})))
- }
  // Separate white areas protect every label and amount from the watermark.
  round(margin,blockTop,bw,bh,9,white);text('COORDONNÉES BANCAIRES',margin+12,blockTop-18,7.5,bold);text(`BIC : ${p.bic||'à renseigner'}`,margin+12,blockTop-38,8);text(`IBAN : ${p.iban?p.iban.replace(/\s/g,'').match(/.{1,4}/g)?.join(' '):'à renseigner'}`,margin+12,blockTop-56,7.5)
  round(sx,blockTop,bw,bh)
  const signatureDate=`Fait le ${p.dateSignature}`,signatureLabel='Signature du bailleur'
  text(signatureDate,sx+12,blockTop-38,8);text(signatureLabel,sx+12,blockTop-56,8)
  if(p.signatureDataUrl?.includes('base64,')){try{const bytes=Buffer.from(p.signatureDataUrl.split('base64,')[1],'base64');let image;try{image=await pdf.embedPng(bytes)}catch{image=await pdf.embedJpg(bytes)}const d=image.scaleToFit(124,60);page.drawImage(image,{x:sx+bw-12-d.width,y:bottom+(bh-d.height)/2,width:d.width,height:d.height})}catch{}}
+ if(p.verification){
+  const verify=p.verification,qr=await pdf.embedPng(Buffer.from(verify.qrDataUrl.split('base64,')[1],'base64')),qrSize=66,qrX=width-margin-qrSize,qrY=bottom-76
+  page.drawImage(qr,{x:qrX,y:qrY,width:qrSize,height:qrSize})
+  text('VÉRIFIER CE DOCUMENT',margin,bottom-22,8,bold)
+  text('Scannez ce QR code et comparez la référence,',margin,bottom-36,7.5)
+  text('les dates et les montants avec la version enregistrée.',margin,bottom-47,7.5)
+  text(`Référence : ${verify.reference}`,margin,bottom-61,7.5)
+  text(new URL(verify.url).origin+'/verifier',margin,bottom-73,6.5,regular,blue)
+  page.node.addAnnot(pdf.context.register(pdf.context.obj({Type:'Annot',Subtype:'Link',Rect:[qrX,qrY,qrX+qrSize,qrY+qrSize],Border:[0,0,0],A:{S:'URI',URI:PDFString.of(verify.url)}})))
+ }
  return pdf.save()
 }
