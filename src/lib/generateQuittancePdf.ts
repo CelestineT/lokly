@@ -12,7 +12,7 @@ const CHARGE_LABELS:Record<string,string>={eau_froide:'eau froide',eau_chaude:'e
 export function chargeLabels(values:unknown):string[]{return Array.isArray(values)?Array.from(new Set(values.filter((v):v is string=>typeof v==='string').map(v=>CHARGE_LABELS[v]).filter(Boolean))):[]}
 
 
-export interface QuittancePdfData{locataireNom:string;locataireEmail?:string;locataireTelephone?:string;proprietaireNom:string;proprietaireEmail?:string;proprietaireTelephone?:string;bienAdresse:string;bienVille:string;bienNom:string;lotNom?:string;typeLogement?:string;specificiteLogement?:string;surface?:number|string;mois:string;reference:string;loyerHc:number;loyerMensuelReference?:number;charges:number;totalPaye?:number;detailCharges?:string[];solde:number;total:number;fraisAnnexes?:number;annexes?:Array<{nom:string;montant:number}>;cautionMontant?:number;prorataDetail?:{jours_occupes:number;jours_mois:number;manuel?:boolean};regularisationCharges?:number;regularisationPeriode?:string;modePaiement?:string;commentaire?:string;iban?:string;bic?:string;signatureDataUrl?:string;dateSignature:string}
+export interface QuittancePdfData{verification?:{url:string;reference:string;qrDataUrl:string};locataireNom:string;locataireEmail?:string;locataireTelephone?:string;proprietaireNom:string;proprietaireEmail?:string;proprietaireTelephone?:string;bienAdresse:string;bienVille:string;bienNom:string;lotNom?:string;typeLogement?:string;specificiteLogement?:string;surface?:number|string;mois:string;reference:string;loyerHc:number;loyerMensuelReference?:number;charges:number;totalPaye?:number;detailCharges?:string[];solde:number;total:number;fraisAnnexes?:number;annexes?:Array<{nom:string;montant:number}>;cautionMontant?:number;prorataDetail?:{jours_occupes:number;jours_mois:number;manuel?:boolean};regularisationCharges?:number;regularisationPeriode?:string;modePaiement?:string;commentaire?:string;iban?:string;bic?:string;signatureDataUrl?:string;dateSignature:string}
 
 export async function generateQuittancePdf(p:QuittancePdfData):Promise<Uint8Array>{
  const pdf=await PDFDocument.create(),logo=await pdf.embedJpg(readFileSync(join(process.cwd(),'public','ekolocs-logo.jpeg'))),regular=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold)
@@ -42,10 +42,22 @@ export async function generateQuittancePdf(p:QuittancePdfData):Promise<Uint8Arra
  }
  const totalsHeight=remainingCents>0?84:58;ensure(totalsHeight+30);page.drawRectangle({x:margin,y:y-18,width:cw,height:18,borderColor:border,borderWidth:.5,color:white});y-=18;const totalsTop=y;round(margin,y,cw,totalsHeight,8,soft);const totals:[string,string,PDFFont][]=[['TOTAL ÉCHÉANCE',eur(p.total),bold],['TOTAL PAYÉ',eur(Number(p.totalPaye??0)),regular],...(remainingCents>0?[['MONTANT IMPAYÉ',eur(remainingCents/100),regular] as [string,string,PDFFont]]:[])];totals.forEach(([label,value,font],i)=>{text(i===0?'TOTAL ÉCHÉANCE':label,margin+12,y-19-i*26,9,font,i===2?rgb(.75,.08,.1):black);if(i===0)text('(charges comprises)',margin+16+bold.widthOfTextAtSize('TOTAL ÉCHÉANCE',9),y-19,8,regular);text(value,width-margin-12-font.widthOfTextAtSize(value,9),y-19-i*26,9,font,i===2?rgb(.75,.08,.1):black)});const stampExtension=status==='PARTIELLEMENT PAYÉ'?8:0,stampSize=Math.min(status==='PAYÉ'?32:20,(130+stampExtension)/(bold.widthOfTextAtSize(status,1)*Math.cos(35*Math.PI/180))),stampWidth=bold.widthOfTextAtSize(status,stampSize);page.drawText(status,{x:250-stampExtension,y:totalsTop-48-stampExtension*Math.tan(35*Math.PI/180),size:stampSize,font:bold,color:black,opacity:.14,rotate:degrees(35)});y-=totalsHeight+16
  // Keep payment mode and the glossary on one baseline, before the final blocks.
- const bh=76,bottom=54,blockTop=bottom+bh,bw=(cw-gap)/2,sx=margin+bw+gap
- if(y<blockTop+16)newPage()
+ const bh=76,bw=(cw-gap)/2,sx=margin+bw+gap
+ let bottom=54,blockTop=bottom+bh
+ if(y<blockTop+(p.verification?84:16)){newPage();if(p.verification){blockTop=y-94;bottom=blockTop-bh}}
  const mode=p.modePaiement||'À renseigner',glossary='* HC : Hors Charges et CC : Charges comprises',glossarySize=5.8,glossaryX=width-margin-12-regular.widthOfTextAtSize(glossary,glossarySize)
  text('MODE DE PAIEMENT',margin,y,7.5,bold);text(mode,margin+104,y,8);text(glossary,glossaryX,y,glossarySize)
+
+ if(p.verification){
+  const verify=p.verification,qr=await pdf.embedPng(Buffer.from(verify.qrDataUrl.split('base64,')[1],'base64')),qrSize=66,qrX=width-margin-qrSize,qrY=y-78
+  page.drawImage(qr,{x:qrX,y:qrY,width:qrSize,height:qrSize})
+  text('VÉRIFIER CE DOCUMENT',margin, y-24,8,bold)
+  text('Scannez ce QR code et comparez la référence,',margin,y-38,7.5)
+  text('les dates et les montants avec la version enregistrée.',margin,y-49,7.5)
+  text(`Référence : ${verify.reference}`,margin,y-63,7.5)
+  text(new URL(verify.url).origin+'/verifier',margin,y-75,6.5,regular,blue)
+  page.node.addAnnot(pdf.context.register(pdf.context.obj({Type:'Annot',Subtype:'Link',Rect:[qrX,qrY,qrX+qrSize,qrY+qrSize],Border:[0,0,0],A:{S:'URI',URI:PDFString.of(verify.url)}})))
+ }
  // Separate white areas protect every label and amount from the watermark.
  round(margin,blockTop,bw,bh,9,white);text('COORDONNÉES BANCAIRES',margin+12,blockTop-18,7.5,bold);text(`BIC : ${p.bic||'à renseigner'}`,margin+12,blockTop-38,8);text(`IBAN : ${p.iban?p.iban.replace(/\s/g,'').match(/.{1,4}/g)?.join(' '):'à renseigner'}`,margin+12,blockTop-56,7.5)
  round(sx,blockTop,bw,bh)
