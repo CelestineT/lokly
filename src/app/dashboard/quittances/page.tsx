@@ -1,4 +1,5 @@
 'use client'
+import {propertyLabel} from '@/lib/propertyNames'
 
 import PeriodNavigation from '@/components/PeriodNavigation'
 import { useEffect, useState } from 'react'
@@ -20,7 +21,7 @@ type Quittance = {
 }
 
 type Locataire = { id: string; nom: string; civilite:string|null; nom_famille:string|null; prenom:string|null; bien_id: string }
-type Bien = { id: string; nom: string; ville: string }
+type Bien = { id: string; nom: string; nom_personnalise?: string | null; ville: string }
 
 function formatMois(mois: string): string {
   const [year, month] = mois.split('-')
@@ -40,7 +41,7 @@ export default function QuittancesPage() {
     Promise.all([
       supabase.from('quittances').select('*').order('mois', { ascending: false }),
       supabase.from('locataires').select('id, nom, civilite, nom_famille, prenom, bien_id'),
-      supabase.from('biens').select('id, nom, ville'),
+      supabase.from('biens').select('*'),
     ]).then(([{ data: q }, { data: l }, { data: b }]) => {
       if (q) setQuittances(q)
       if (l) setLocataires(l)
@@ -127,7 +128,7 @@ export default function QuittancesPage() {
                           <div className="flex items-center gap-2 mb-3 min-h-5">
                             <span className="text-slate-400">⌂</span>
                             <h3 className="text-sm font-semibold text-slate-800 truncate">
-                              {bien ? `${bien.nom}${bien.ville ? ` — ${bien.ville}` : ''}` : 'Bien non renseigné'}
+                              {bien ? `${propertyLabel(bien)}${bien.ville ? ` — ${bien.ville}` : ''}` : 'Bien non renseigné'}
                             </h3>
                             {index === 0 && items.length > 1 && (
                               <span className="text-xs text-slate-400 whitespace-nowrap">
@@ -140,7 +141,7 @@ export default function QuittancesPage() {
                             <div className="flex items-start justify-between gap-3 mb-3">
                               <div className="min-w-0">
                                 <h4 className="font-semibold text-slate-900 truncate">{formatLocataireName(locataire, '—')}</h4>
-                                {bien && <p className="text-xs text-slate-400 truncate">{bien.nom} — {bien.ville}</p>}
+                                {bien && <p className="text-xs text-slate-400 truncate">{propertyLabel(bien)} — {bien.ville}</p>}
                               </div>
                               <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full whitespace-nowrap ${q.envoyee ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
                                 {q.envoyee ? 'Envoyée' : 'À signer'}

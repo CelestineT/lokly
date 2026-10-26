@@ -3,7 +3,8 @@
 export type Bien = {
   id: string
   proprietaire_id: string
-  nom: string           // ex: "APT1 Émile Zola"
+  nom: string           // ex: "Émile Zola"
+  nom_personnalise?: string | null // Intitulé complémentaire, pour tous les types de biens
   adresse: string
   ville: string
   code_postal: string

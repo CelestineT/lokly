@@ -1,4 +1,5 @@
 'use client'
+import {propertyLabel} from '@/lib/propertyNames'
 
 import {useRouter} from 'next/navigation'
 import PeriodNavigation from '@/components/PeriodNavigation'
@@ -22,7 +23,7 @@ type Paiement = {
 }
 
 type Locataire = { id: string; nom: string; civilite:string|null; nom_famille:string|null; prenom:string|null; bien_id: string; qualite_interne?:string|null }
-type Bien = { id: string; nom: string; ville: string }
+type Bien = { id: string; nom: string; nom_personnalise?: string | null; ville: string }
 
 function formatMois(mois: string): string {
   const [year, month] = mois.split('-')
@@ -57,7 +58,7 @@ export default function PaiementsPage() {
     const [{ data: p }, { data: l }, { data: b }] = await Promise.all([
       supabase.from('paiements').select('*').order('date_paiement', { ascending: false }),
       supabase.from('locataires').select('*'),
-      supabase.from('biens').select('id, nom, ville'),
+      supabase.from('biens').select('*'),
     ])
     if (p) setPaiements(p)
     if (l) setLocataires(l)
@@ -113,7 +114,7 @@ export default function PaiementsPage() {
             const statut = Number(p.montant)===0&&Number(p.caution_recue??0)===0?statutConfig.en_retard:statutConfig[p.statut]
             const datePaiement = new Date(p.date_paiement).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
             return <div key={p.id}>{(index===0||paiementsFiltres[index-1].mois!==p.mois)&&<h2 className="px-4 py-2 bg-slate-50 text-sm font-semibold">{formatMois(p.mois)}</h2>}<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-4">
-              <div><p className="font-medium text-slate-900 text-sm">{formatLocataireName(locataire, '—')}</p><p className="text-xs text-slate-400">{bien ? `${bien.nom} · ` : ''}{formatMois(p.mois)} · {datePaiement}</p>{Number(p.montant)===0&&<p className="text-xs text-amber-700 mt-1">Loyer du mois non payé</p>}{Number(p.solde_anterieur??0)>0&&<p className="text-xs text-amber-700">Solde antérieur : {Number(p.solde_anterieur).toLocaleString('fr-FR')} €</p>}{Number(p.caution_recue??0)>0&&<p className="text-xs text-slate-500">Caution encaissée : {Number(p.caution_recue).toLocaleString('fr-FR')} €</p>}{p.commentaire && <p className="text-xs text-slate-400 italic mt-0.5">{p.commentaire}</p>}</div>
+              <div><p className="font-medium text-slate-900 text-sm">{formatLocataireName(locataire, '—')}</p><p className="text-xs text-slate-400">{bien ? `${propertyLabel(bien)} · ` : ''}{formatMois(p.mois)} · {datePaiement}</p>{Number(p.montant)===0&&<p className="text-xs text-amber-700 mt-1">Loyer du mois non payé</p>}{Number(p.solde_anterieur??0)>0&&<p className="text-xs text-amber-700">Solde antérieur : {Number(p.solde_anterieur).toLocaleString('fr-FR')} €</p>}{Number(p.caution_recue??0)>0&&<p className="text-xs text-slate-500">Caution encaissée : {Number(p.caution_recue).toLocaleString('fr-FR')} €</p>}{p.commentaire && <p className="text-xs text-slate-400 italic mt-0.5">{p.commentaire}</p>}</div>
               <div className="flex items-center gap-3 flex-shrink-0"><span className="font-bold text-slate-900 text-sm">{(p.montant+Number(p.caution_recue??0)).toLocaleString('fr-FR')} €</span><span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${statut.class}`}>{statut.label}</span><div className="flex items-center gap-1 ml-1"><button type="button" onClick={() => router.push(`/dashboard/paiements/nouveau?modifier=${encodeURIComponent(p.id)}`)} title="Modifier le paiement" className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.5-8.5a2.121 2.121 0 013 3L12 16l-4 1 1-4 8.5-8.5z" /></svg></button><button type="button" onClick={() => annulerPaiement(p)} title="Annuler le paiement" className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button></div></div>
             </div></div>
           })}

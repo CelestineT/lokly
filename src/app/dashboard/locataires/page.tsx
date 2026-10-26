@@ -9,7 +9,7 @@ import DeleteLocataireButton from './DeleteLocataireButton'
 import { formatLocataireName } from '@/lib/locataireName'
 
 type Locataire = { id:string; bien_id:string; bail_id:string|null; est_principal:boolean|null; civilite:string|null; nom_famille:string|null; prenom:string|null; nom:string; email:string; date_entree:string; date_sortie:string|null; loyer_hc:number; charges:number; caution_payee:boolean; actif:boolean; created_at:string }
-type Bien = { id:string; nom:string; adresse:string; ville:string; type:string|null; annexes:string[]|null }
+type Bien = { id:string; nom:string; nom_personnalise?:string|null; adresse:string; ville:string; type:string|null; annexes:string[]|null }
 type Bail = { id:string; bien_id:string; lot_id:string|null; type_occupation:string; date_entree:string; date_sortie:string|null; loyer_hc:number; charges:number; caution_payee:boolean; actif:boolean; created_at:string }
 type Lot = { id:string; bien_id:string; numero_lot:string|null; nom_personnalise:string|null; type:string|null; specificite:string|null; annexes:string[]|null }
 type Affectation = { bail_id:string; lot_id:string; date_fin:string|null; date_debut:string; prix_mensuel:number }
@@ -22,7 +22,7 @@ export default async function LocatairesPage() {
   const orders=await getCardOrders()
   const [{ data: locatairesData },{ data: biensData },{ data: bauxData },{ data: lotsData },{ data: affectationsData }] = await Promise.all([
     readAllRows(supabase.from('locataires').select('*').order('created_at', { ascending: false })),
-    supabase.from('biens').select('id, nom, adresse, ville, type, annexes'),
+    supabase.from('biens').select('*'),
     readAllRows(supabase.from('baux').select('*')),
     supabase.from('lots').select('id, bien_id, numero_lot, nom_personnalise, type, specificite, annexes'),
     readAllRows(supabase.from('affectations_lots_baux').select('id, bail_id, lot_id, date_debut, date_fin, prix_mensuel'))
@@ -80,6 +80,7 @@ export default async function LocatairesPage() {
           {!termine && <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full flex-shrink-0 ${cautionPayee ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{cautionPayee ? 'Caution reçue' : 'Caution en attente'}</span>}
         </div>
         {bien && <p className="text-sm text-slate-500 mb-1 pointer-events-none">⌂ {bien.nom} — {bien.ville}</p>}
+        {!lot&&bien?.nom_personnalise?.trim()&&<p className="text-xs text-slate-500 pointer-events-none"><span className="font-medium">Bien occupé :</span> {bien.nom_personnalise.trim()}</p>}
         {principalLotLabel && <p className="text-xs text-slate-500 pointer-events-none"><span className="font-medium">Lot occupé :</span> {principalLotLabel}</p>}
         {incluses.length>0&&<p className="text-xs text-slate-500 mt-1 pointer-events-none">{incluses.join(', ')} <span>(annexes incluses)</span></p>}
         {lotManquant && <div className="relative z-10 mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800"><p>Lot occupé non renseigné : son intitulé ne peut pas être affiché.</p>{bail && <Link href={`/dashboard/locataires/${principal.id}/modifier-bail`} className="inline-block mt-1 font-medium underline">Renseigner le lot occupé</Link>}</div>}
