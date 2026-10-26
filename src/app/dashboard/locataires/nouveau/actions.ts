@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { formatLocataireName } from '@/lib/locataireName'
 
 export async function ajouterLocataire(formData: FormData) {
   const supabase = await createClient()
@@ -22,6 +23,18 @@ export async function ajouterLocataire(formData: FormData) {
   const type_occupation = (formData.get('type_occupation') as string) || 'individuel'
 
   if (!bien_id || !date_entree) return { error: 'Le bien et la date d’entrée sont requis' }
+
+  // Le rattachement doit aussi être validé côté serveur, même si le formulaire est contourné.
+  const { data: bien, error: bienError } = await supabase.from('biens')
+    .select('id,type').eq('id', bien_id).eq('proprietaire_id', user.id).maybeSingle()
+  if (bienError || !bien) return { error: 'Bien introuvable ou inaccessible' }
+  const isImmeuble = ['immeuble', 'immeuble_rapport'].includes(bien.type ?? '')
+  if (isImmeuble && !lot_id) return { error: 'Sélectionnez le lot occupé dans cet immeuble.' }
+  if (lot_id) {
+    const { data: lot, error: lotError } = await supabase.from('lots')
+      .select('id').eq('id', lot_id).eq('bien_id', bien_id).eq('proprietaire_id', user.id).maybeSingle()
+    if (lotError || !lot) return { error: 'Le lot sélectionné ne correspond pas à ce bien.' }
+  }
 
   const echeance = new Date(date_entree)
   echeance.setFullYear(echeance.getFullYear() + duree_bail_ans)
@@ -49,7 +62,7 @@ export async function ajouterLocataire(formData: FormData) {
     const payload: Record<string, unknown> = {
       proprietaire_id: user.id, bien_id, bail_id: bail.id, est_principal: i === 0,
       civilite, prenom, nom_famille:nomFamille,
-      nom: `${civilite?civilite+' ':''}${nomFamille.toUpperCase()} ${prenom}`.trim(),
+      nom: formatLocataireName({civilite,nom_famille:nomFamille,prenom},''),
       email: loc.email.trim(), telephone: loc.telephone.trim() || null,
       date_entree, loyer_hc, charges, caution, caution_payee, duree_bail_ans,
       echeance_bail, mode_paiement: mode_paiement || null, commentaire: commentaire || null, actif: true,

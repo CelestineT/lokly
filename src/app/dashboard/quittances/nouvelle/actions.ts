@@ -1,20 +1,21 @@
 'use server'
 import {createClient} from '@/lib/supabase/server'
+import {validCalendarDate} from '@/lib/receiptBilling'
+import {resolveRentalEntry,rentalEntrySchemaError} from '@/lib/resolveRentalEntry'
 import {revalidatePath} from 'next/cache'
-export async function creerQuittance(formData:FormData){
- const s=await createClient(),{data:{user},error:authError}=await s.auth.getUser();if(authError||!user)return{error:'Vous devez être connecté pour créer une quittance.'}
- const locataireId=String(formData.get('locataire_id')??''),mois=String(formData.get('mois')??''),commentaire=String(formData.get('commentaire')??'');if(!locataireId||!mois)return{error:'Le bail et le mois sont obligatoires.'}
- const{data:loc,error:le}=await s.from('locataires').select('id,bien_id,bail_id,loyer_hc,charges').eq('id',locataireId).eq('proprietaire_id',user.id).single();if(le||!loc)return{error:'Locataire introuvable.'}
- let bailId=loc.bail_id as string|null,loyer=Number(loc.loyer_hc??0),charges=Number(loc.charges??0)
- if(bailId){const{data:b}=await s.from('baux').select('loyer_hc,charges').eq('id',bailId).eq('proprietaire_id',user.id).single();if(b){loyer=Number(b.loyer_hc??0);charges=Number(b.charges??0)}}
- const[y,m]=mois.split('-').map(Number);if(!y||!m)return{error:'Période de quittance invalide.'};const debut=`${mois}-01`,fin=new Date(y,m,0).toISOString().slice(0,10)
- let detail:Array<{lot_id:string;numero_lot:string;type:string;prix_mensuel:number}>=[]
- if(bailId){const{data:a,error:e}=await s.from('affectations_lots_baux').select('lot_id,date_debut,date_fin,prix_mensuel,lots(numero_lot,type)').eq('bail_id',bailId).lte('date_debut',fin).or(`date_fin.is.null,date_fin.gte.${debut}`);if(e)return{error:`Impossible de vérifier les lots rattachés : ${e.message}`};detail=(a??[]).map((x:any)=>{const l=Array.isArray(x.lots)?x.lots[0]:x.lots;return{lot_id:x.lot_id,numero_lot:l?.numero_lot??'',type:l?.type??'lot',prix_mensuel:Number(x.prix_mensuel??0)}})}
- const lotsTotal=detail.reduce((n,l)=>n+l.prix_mensuel,0),solde=Number(formData.get('solde')??0)||0,totalMois=loyer+charges+lotsTotal,totalAffiche=totalMois+solde
- // Le solde antérieur est informatif : il apparaît sur la quittance mais ne bloque pas l'édition du mois courant.
- let occupantIds=[loc.id];if(bailId){const{data:os}=await s.from('locataires').select('id').eq('bail_id',bailId).eq('proprietaire_id',user.id);if(os?.length)occupantIds=os.map(o=>o.id)}
- const{data:p,error:pe}=await s.from('paiements').select('montant,statut').eq('proprietaire_id',user.id).in('locataire_id',occupantIds).eq('mois',mois).in('statut',['recu','partiel']);if(pe)return{error:`Impossible de vérifier le paiement : ${pe.message}`};const encaisse=(p??[]).reduce((n,x)=>n+Number(x.montant??0),0);if(encaisse+.001<totalMois){const reste=totalMois-encaisse;return{error:`Quittance indisponible : ${encaisse.toLocaleString('fr-FR',{minimumFractionDigits:2})} € encaissés sur ${totalMois.toLocaleString('fr-FR',{minimumFractionDigits:2})} €. Il reste ${reste.toLocaleString('fr-FR',{minimumFractionDigits:2})} € à régler.`,code:'PAYMENT_REQUIRED' as const,locataireId:loc.id,bailId,mois,montantAttendu:totalMois,montantEncaisse:encaisse}}
- if(bailId){const{data:occupants}=await s.from('locataires').select('id').eq('bail_id',bailId).eq('proprietaire_id',user.id);const ids=(occupants??[]).map(o=>o.id);if(ids.length){const{data:exist}=await s.from('quittances').select('id').eq('proprietaire_id',user.id).eq('mois',mois).in('locataire_id',ids).limit(1);if(exist?.length)return{error:'Une quittance existe déjà pour ce bail et cette période.'}}}else{const{data:exist}=await s.from('quittances').select('id').eq('proprietaire_id',user.id).eq('locataire_id',locataireId).eq('mois',mois).maybeSingle();if(exist)return{error:'Une quittance existe déjà pour ce locataire et cette période.'}}
- const{error}=await s.from('quittances').insert({proprietaire_id:user.id,locataire_id:locataireId,bien_id:loc.bien_id??null,mois,loyer_hc:loyer,charges,lots_annexes_total:lotsTotal,lots_annexes_detail:detail,solde,total:totalAffiche,envoyee:false,caution_affichee:formData.get('caution_affichee')==='on',date_signature:String(formData.get('date_signature')??''),commentaire:commentaire||null});if(error)return{error:error.message}
- revalidatePath('/dashboard/quittances');revalidatePath('/dashboard/paiements');revalidatePath('/dashboard');revalidatePath('/dashboard/rentabilite');return{ok:true}
+export async function creerQuittance(fd:FormData){return enregistrerQuittance(fd)}
+export async function modifierQuittance(id:string,fd:FormData){if(!id)return{error:'Quittance manquante.'};return enregistrerQuittance(fd,id)}
+async function enregistrerQuittance(fd:FormData,id?:string){
+ const s=await createClient(),{data:{user},error:authError}=await s.auth.getUser();if(authError||!user)return{error:'Vous devez être connecté.'}
+ if(id){const{data:old,error}=await s.from('quittances').select('id').eq('id',id).eq('proprietaire_id',user.id).single();if(error||!old)return{error:'Quittance introuvable ou accès non autorisé.'}}
+ const signature=validCalendarDate(fd.get('date_signature'));if(!signature)return{error:'Choisissez une date de signature valide.'}
+ const r=await resolveRentalEntry(s,user.id,fd);if(!r.ok)return{error:r.error}
+ const{data:p,error:pe}=await s.from('paiements').select('*').eq('proprietaire_id',user.id).in('locataire_id',r.occupantIds!).eq('mois',r.mois).in('statut',['recu','partiel']);if(pe)return{error:'Impossible de vérifier les paiements.'}
+ const encaisse=(p??[]).reduce((n:number,x:any)=>n+Number(x.montant??0),0);if(encaisse+.001<r.monthDue!)return{error:`Quittance indisponible : ${encaisse.toLocaleString('fr-FR')} € encaissés sur ${r.monthDue!.toLocaleString('fr-FR')} €.`,code:'PAYMENT_REQUIRED' as const,locataireId:r.loc.id,bailId:r.bailId,mois:r.mois,montantAttendu:r.monthDue!,montantEncaisse:encaisse}
+ let duplicate=s.from('quittances').select('id').eq('proprietaire_id',user.id).eq('mois',r.mois).in('locataire_id',r.occupantIds!);if(id)duplicate=duplicate.neq('id',id)
+ const{data:existing,error:de}=await duplicate.limit(1);if(de)return{error:'Impossible de vérifier les doublons.'};if(existing?.length)return{error:'Une quittance existe déjà pour ce bail et ce mois.'}
+ const payload={proprietaire_id:user.id,locataire_id:r.loc.id,bien_id:r.loc.bien_id,mois:r.mois,loyer_hc:r.loyer,charges:r.charges,lots_annexes_total:r.lotsTotal,lots_annexes_detail:r.annexes,regularisation_charges:r.regularisation,regularisation_periode:r.periode,solde:r.solde,total:r.total,caution_affichee:r.cautionAffichee,caution_montant:r.caution,caution_encaissee:r.cautionEncaissee,caution_total_inclus:true,prorata_detail:r.prorata,date_signature:signature,commentaire:String(fd.get('commentaire')??'')||null,envoyee:false}
+ const query=id?s.from('quittances').update(payload).eq('id',id).eq('proprietaire_id',user.id):s.from('quittances').insert(payload)
+ const{data:saved,error}=await query.select('id').single();if(error||!saved)return{error:rentalEntrySchemaError(error?.message??'La quittance n’a pas été enregistrée.')}
+ revalidatePath('/dashboard','layout');return{ok:true,id:saved.id}
 }

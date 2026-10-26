@@ -1,0 +1,8 @@
+import {rentRevisions,type RentSource} from '@/lib/rentHistory'
+import {rentalDate} from '@/lib/rentalTotals'
+const euro=(value:unknown)=>Number(value??0).toLocaleString('fr-FR',{style:'currency',currency:'EUR'})
+const monthLabel=(date:string)=>new Date(`${date.slice(0,7)}-01T12:00:00`).toLocaleDateString('fr-FR',{month:'long',year:'numeric'})
+export default function TenantRentHistory({source,dateEntree}:{source:RentSource;dateEntree?:string|null}){
+ const revisions=rentRevisions(source),month=rentalDate().slice(0,7),applied=revisions.filter(r=>r.date_effet.slice(0,7)<=month).at(-1)
+ return <section aria-labelledby="rent-history-title"><h2 id="rent-history-title" className="head">Historique des loyers et charges</h2><ol className="space-y-3 text-sm"><li className="rounded-xl border border-slate-100 bg-slate-50 p-3"><p className="font-medium">Montant initial{dateEntree?` · ${monthLabel(dateEntree)}`:''}</p><p className="mt-1">{euro(source.loyer_hc)} HC + {euro(source.charges)} de charges</p></li>{revisions.map(r=><li key={r.date_effet} className="rounded-xl border border-slate-100 bg-slate-50 p-3"><div className="flex flex-wrap items-baseline justify-between gap-2"><p className="font-medium">À partir de {monthLabel(r.date_effet)}</p>{r.date_effet.slice(0,7)>month?<span className="text-xs text-blue-700">Programmée</span>:r===applied?<span className="text-xs text-slate-500">Dernière révision appliquée</span>:null}</div><p className="mt-1">{euro(r.loyer_hc)} HC + {euro(r.charges)} de charges</p>{r.motif&&<p className="mt-1 whitespace-pre-wrap break-words text-slate-500">{r.motif}</p>}</li>)}</ol>{!revisions.length&&<p className="mt-2 text-xs text-slate-500">Aucune révision enregistrée.</p>}</section>
+}
