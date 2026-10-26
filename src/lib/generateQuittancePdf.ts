@@ -35,9 +35,9 @@ async function renderQuittancePdf(p:QuittancePdfData,compact:boolean):Promise<Ui
  function ensure(h:number){if(y-h<60)newPage()}
  function card(x:number,w:number,title:string,content:string[],top:number,h:number,fill=white){round(x,top,w,h,9,fill);text(title,x+12,top-18,7.5,bold);let cy=top-(compact?33:37);for(const value of content){for(const line of lines(value,8.5,w-24)){text(line,x+12,cy,8.5);cy-=13}}}
  newPage()
- const iw=(cw-gap)/2,parties=[[p.proprietaireNom||'-',p.proprietaireTelephone?`Tél. : ${p.proprietaireTelephone}`:'',p.proprietaireEmail||''].filter(Boolean),[p.locataireNom||'-',p.locataireTelephone?`Tél. : ${p.locataireTelephone}`:'',p.locataireEmail||''].filter(Boolean)],ih=Math.max(compact?68:78,...parties.map(c=>(compact?34:38)+c.reduce((s,v)=>s+lines(v,8.5,iw-24).length*13,0)))
+ const iw=(cw-gap)/2,parties=[[p.proprietaireNom||'-',p.proprietaireTelephone?`Tél. : ${p.proprietaireTelephone}`:'',p.proprietaireEmail?`Mail : ${p.proprietaireEmail}`:''].filter(Boolean),[p.locataireNom||'-',p.locataireTelephone?`Tél. : ${p.locataireTelephone}`:'',p.locataireEmail?`Mail : ${p.locataireEmail}`:''].filter(Boolean)],ih=Math.max(compact?68:78,...parties.map(c=>(compact?34:38)+c.reduce((s,v)=>s+lines(v,8.5,iw-24).length*13,0)))
  ensure(ih);card(margin,iw,'COORDONNÉES BAILLEUR',parties[0],y,ih,soft);card(margin+iw+gap,iw,'INFORMATIONS LOCATAIRE',parties[1],y,ih,soft);y-=ih+sectionGap
- const pw=(cw-gap*2)/3,blocks=[{t:'IMMEUBLE',l:[p.bienNom||'-']},{t:'ADRESSE DE LA LOCATION',l:[p.bienAdresse||'-',p.bienVille||'']},{t:'TYPE DE LOGEMENT',l:[p.typeLogement||'À renseigner',p.specificiteLogement||'',p.surface?`${p.surface} m²`:'']}],ph=Math.max(compact?68:78,...blocks.map(b=>(compact?34:38)+b.l.filter(Boolean).reduce((sum,v)=>sum+lines(v,8.5,pw-24).length*13,0)))
+ const pw=(cw-gap*2)/3,blocks=[{t:'IMMEUBLE',l:[p.bienNom||'-']},{t:'ADRESSE DE LA LOCATION',l:[p.bienAdresse||'-',p.bienVille||'']},{t:'LOGEMENT OCCUPÉ',l:[p.typeLogement||'À renseigner',p.specificiteLogement||'',p.surface?`${p.surface} m²`:'']}],ph=Math.max(compact?68:78,...blocks.map(b=>(compact?34:38)+b.l.filter(Boolean).reduce((sum,v)=>sum+lines(v,8.5,pw-24).length*13,0)))
  ensure(ph);blocks.forEach((b,i)=>card(margin+i*(pw+gap),pw,b.t,b.l.filter(Boolean),y,ph,soft));y-=ph+sectionGap
  const messages=lines(p.commentaire||'Aucune information complémentaire.',8.5,cw-24)
  for(let offset=0;offset<messages.length;offset+=8){const chunk=messages.slice(offset,offset+8),mh=(compact?32:36)+chunk.length*12;ensure(mh);round(margin,y,cw,mh);text(offset?'INFORMATION - SUITE':'INFORMATION',margin+12,y-18,7.5,bold);chunk.forEach((line,i)=>text(line,margin+12,y-36-i*12,8.5));y-=mh+sectionGap}
@@ -61,16 +61,18 @@ async function renderQuittancePdf(p:QuittancePdfData,compact:boolean):Promise<Ui
  // Separate white areas protect every label and amount from the watermark.
  round(margin,blockTop,bw,bh,9,white);text('COORDONNÉES BANCAIRES',margin+12,blockTop-18,7.5,bold);text(`BIC : ${p.bic||'à renseigner'}`,margin+12,blockTop-38,8);text(`IBAN : ${p.iban?p.iban.replace(/\s/g,'').match(/.{1,4}/g)?.join(' '):'à renseigner'}`,margin+12,blockTop-56,7.5)
  round(sx,blockTop,bw,bh)
- const signatureDate=`Fait le ${p.dateSignature}`,signatureLabel='Signature du bailleur'
- text(signatureDate,sx+12,blockTop-38,8);text(signatureLabel,sx+12,blockTop-56,8)
+ const signatureDate=`Fait le ${p.dateSignature}`,signatureLabel='Signature du bailleur :' 
+ text(signatureDate,sx+12,blockTop-18,8);text(signatureLabel,sx+12,blockTop-34,8)
  if(p.signatureDataUrl?.includes('base64,')){try{const bytes=Buffer.from(p.signatureDataUrl.split('base64,')[1],'base64');let image;try{image=await pdf.embedPng(bytes)}catch{image=await pdf.embedJpg(bytes)}const d=image.scaleToFit(124,60);page.drawImage(image,{x:sx+bw-12-d.width,y:bottom+(bh-d.height)/2,width:d.width,height:d.height})}catch{}}
  if(p.verification){
   const verify=p.verification,qr=await pdf.embedPng(Buffer.from(verify.qrDataUrl.split('base64,')[1],'base64')),qrSize=66,qrX=width-margin-qrSize,qrY=bottom-76
   page.drawImage(qr,{x:qrX,y:qrY,width:qrSize,height:qrSize})
   text('VÉRIFIER CE DOCUMENT',margin,bottom-22,8,bold)
-  text('Scannez ce QR code et comparez la référence,',margin,bottom-36,7.5)
-  text('les dates et les montants avec la version enregistrée.',margin,bottom-47,7.5)
-  text(`Référence : ${verify.reference}`,margin,bottom-61,7.5)
+  text('Scannez le QR code à droite pour vérifier',margin,bottom-34,7)
+  text('l’authenticité des informations. En cas de doute,',margin,bottom-44,7)
+  text('merci de prendre contact avec le bailleur',margin,bottom-54,7)
+  text('aux coordonnées renseignées.',margin,bottom-64,7)
+  text(`Référence : ${verify.reference}`,margin+270,bottom-22,6.5)
   text(new URL(verify.url).origin+'/verifier',margin,bottom-73,6.5,regular,blue)
   page.node.addAnnot(pdf.context.register(pdf.context.obj({Type:'Annot',Subtype:'Link',Rect:[qrX,qrY,qrX+qrSize,qrY+qrSize],Border:[0,0,0],A:{S:'URI',URI:PDFString.of(verify.url)}})))
  }
