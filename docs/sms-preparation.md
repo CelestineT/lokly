@@ -1,7 +1,7 @@
 # Modèles SMS — préparation et simulation
 
 ## Accès
-Depuis **Locataires → Préparer des SMS**, ou **Paramètres → Modèles de SMS → Préparer et tester les SMS**. URL : `/dashboard/sms`.
+Depuis **Communication → Envoyer des SMS**. L’onglet Communication se situe après Documents et avant Paramètres, dans le menu sur ordinateur et sur mobile. URL conservée : `/dashboard/sms`.
 
 Les neuf modèles approuvés sont intégrés au code. L’expéditeur prévu est **LE BAILLEUR** (11 caractères). Aucun nouveau SQL, compte SMS ou secret n’est requis pour la simulation.
 

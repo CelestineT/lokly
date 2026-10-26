@@ -47,7 +47,7 @@ Il faut être autorisé à la fois dans cette table administrée et dans SMS_TES
 La migration ne modifie aucun bien, bail, paiement ou quittance. Elle ajoute un journal privé de tests et une liste d’autorisation. Aucun texte SMS ni numéro complet n’est conservé dans le journal : seulement les quatre derniers chiffres, le nombre de segments estimé, l’empreinte de la demande et les références/statuts Twilio.
 
 ## 4. Premier essai réel
-1. Ouvrir **Locataires → Préparer des SMS**, puis descendre à **Test réel avec Twilio**.
+1. Ouvrir **Communication → Envoyer des SMS**, puis descendre à **Test réel avec Twilio**.
 2. Vérifier les quatre derniers chiffres du téléphone et l’expéditeur configuré.
 3. Saisir un message court (maximum trois segments par essai) ; ne laisser aucun champ entre accolades.
 4. Cocher la confirmation autorisant cet envoi vers un numéro qui vous appartient ou celui d’un testeur ayant donné son accord.
