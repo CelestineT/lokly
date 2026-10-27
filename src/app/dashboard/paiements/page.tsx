@@ -92,7 +92,7 @@ export default function PaiementsPage() {
   return (
     <div className="paiements-ui max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-        <div><h1 className="text-2xl font-bold text-slate-900">Paiements loyers</h1><p className="text-slate-500 text-sm mt-1">{matchingPaiements.length} paiement{matchingPaiements.length !== 1 ? 's' : ''}</p></div>
+        <div><h1 className="text-2xl font-bold text-slate-900">Paiements loyers</h1><p className="text-slate-500 text-sm mt-1">Suivez les échéances et les règlements de vos baux.</p></div>
         <Link href="/dashboard/paiements/nouveau" className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>Enregistrer un paiement
         </Link>
@@ -103,7 +103,7 @@ export default function PaiementsPage() {
       <PaymentPeriod months={moisDisponibles} value={filtreMois} onChange={setFiltreMois}/>
       <div className="paiements-filters"><input aria-label="Rechercher un locataire ou un bien" placeholder="Rechercher un locataire ou un bien" value={recherche} onChange={e=>setRecherche(e.target.value)}/><select aria-label="Filtrer par bien" value={bienFiltre} onChange={e=>setBienFiltre(e.target.value)}><option value="">Tous les biens</option>{biens.map(b=><option key={b.id} value={b.id}>{propertyLabel(b)}</option>)}</select><select aria-label="Filtrer par statut" value={statutFiltre} onChange={e=>setStatutFiltre(e.target.value)}><option value="">Tous les statuts</option><option value="recu">Reçu</option><option value="partiel">Partiel</option><option value="en_retard">À payer</option></select></div>
       <PaymentSchedulePanel month={filtreMois} recherche={recherche} bienFiltre={bienFiltre} statutFiltre={statutFiltre} revision={revision}/>
-      <details className="payments-history"><summary>Historique des paiements enregistrés</summary>
+      <details id="payments-history" className="payments-history"><summary>Historique des paiements enregistrés</summary>
       <p className="payments-history-total">Total encaissé sur la sélection, caution comprise : <strong>{totalRecu.toLocaleString('fr-FR')} €</strong></p>
       <div className="min-w-0">
 
