@@ -1,178 +1,30 @@
 'use client'
-import {propertyLabel} from '@/lib/propertyNames'
-
-import PeriodNavigation from '@/components/PeriodNavigation'
-import { useEffect, useState } from 'react'
+import './quittances.css'
+import {useEffect,useMemo,useState} from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import { formatLocataireName } from '@/lib/locataireName'
+import PaymentPeriod from '../paiements/PaymentPeriod'
+import {createClient} from '@/lib/supabase/client'
+import {formatLocataireName} from '@/lib/locataireName'
+import {receiptPaymentTotals} from '@/lib/receiptBilling'
+import {propertyLabel} from '@/lib/propertyNames'
+import {propertyLocality} from '@/lib/propertyLocality'
 
-type Quittance = {
-  id: string
-  locataire_id: string
-  bien_id: string | null
-  mois: string
-  loyer_hc: number
-  charges: number
-  solde: number
-  total: number
-  envoyee: boolean
-  date_signature: string
-}
-
-type Locataire = { id: string; nom: string; civilite:string|null; nom_famille:string|null; prenom:string|null; bien_id: string }
-type Bien = { id: string; nom: string; nom_personnalise?: string | null; ville: string }
-
-function formatMois(mois: string): string {
-  const [year, month] = mois.split('-')
-  const date = new Date(Number(year), Number(month) - 1, 1)
-  return date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
-    .replace(/^./, (c) => c.toUpperCase())
-}
-
-export default function QuittancesPage() {
-  const [quittances, setQuittances] = useState<Quittance[]>([])
-  const [locataires, setLocataires] = useState<Locataire[]>([])
-  const [biens, setBiens] = useState<Bien[]>([])
-  const [filtreMois, setFiltreMois] = useState('')
-
-  useEffect(() => {
-    const supabase = createClient()
-    Promise.all([
-      supabase.from('quittances').select('*').order('mois', { ascending: false }),
-      supabase.from('locataires').select('id, nom, civilite, nom_famille, prenom, bien_id'),
-      supabase.from('biens').select('*'),
-    ]).then(([{ data: q }, { data: l }, { data: b }]) => {
-      if (q) setQuittances(q)
-      if (l) setLocataires(l)
-      if (b) setBiens(b)
-    })
-  }, [])
-
-  const locatairesMap = new Map(locataires.map((l) => [l.id, l]))
-  const biensMap = new Map(biens.map((b) => [b.id, b]))
-
-  // Niveau 1 : période. Niveau 2 : bien.
-  // On privilégie le bien_id historisé sur la quittance ; le bien actuel du
-  // locataire ne sert que de fallback pour les anciennes quittances.
-  const grouped = new Map<string, Map<string, Quittance[]>>()
-  for (const q of quittances) {
-    const locataire = locatairesMap.get(q.locataire_id)
-    const bienId = q.bien_id ?? locataire?.bien_id ?? 'sans-bien'
-    const byBien = grouped.get(q.mois) ?? new Map<string, Quittance[]>()
-    const list = byBien.get(bienId) ?? []
-    list.push(q)
-    byBien.set(bienId, list)
-    grouped.set(q.mois, byBien)
-  }
-
-  const sortedMois = Array.from(grouped.keys()).sort((a, b) => b.localeCompare(a))
-  const moisAffiches = filtreMois ? sortedMois.filter((mois) => mois.startsWith(filtreMois)) : sortedMois
-
-  return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Quittances de loyer</h1>
-          <p className="text-slate-500 text-sm mt-1">
-            {quittances.length} quittance{quittances.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <Link href="/dashboard/quittances/nouvelle"
-          className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Créer une quittance
-        </Link>
-      </div>
-
-      <div className="md:grid md:grid-cols-[180px_minmax(0,1fr)] gap-5"><PeriodNavigation months={sortedMois} value={filtreMois} onChange={setFiltreMois}/><div className="min-w-0">
-
-      {quittances.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 flex flex-col items-center text-center">
-          <h2 className="text-lg font-semibold text-slate-800 mb-2">Aucune quittance pour le moment</h2>
-          <p className="text-slate-500 text-sm mb-6 max-w-sm">Générez votre première quittance de loyer.</p>
-          <Link href="/dashboard/quittances/nouvelle"
-            className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors">
-            Créer une quittance
-          </Link>
-        </div>
-      ) : (
-        <div className="space-y-10">
-          {moisAffiches.map((mois) => {
-            const byBien = grouped.get(mois)!
-            const sortedBienIds = Array.from(byBien.keys()).sort((a, b) => {
-              const ba = biensMap.get(a)
-              const bb = biensMap.get(b)
-              const la = ba ? `${ba.nom} ${ba.ville}` : 'ZZZ'
-              const lb = bb ? `${bb.nom} ${bb.ville}` : 'ZZZ'
-              return la.localeCompare(lb, 'fr')
-            })
-
-            return (
-              <section key={mois}>
-                <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
-                  {formatMois(mois)}
-                </h2>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
-                  {sortedBienIds.flatMap((bienId) => {
-                    const items = byBien.get(bienId)!.sort((a,b)=>formatLocataireName(locatairesMap.get(a.locataire_id),'').localeCompare(formatLocataireName(locatairesMap.get(b.locataire_id),''),'fr')||a.id.localeCompare(b.id))
-                    const bien = biensMap.get(bienId)
-
-                    return items.map((q, index) => {
-                      const locataire = locatairesMap.get(q.locataire_id)
-                      return (
-                        <div key={q.id} className="min-w-0">
-                          <div className="flex items-center gap-2 mb-3 min-h-5">
-                            <span className="text-slate-400">⌂</span>
-                            <h3 className="text-sm font-semibold text-slate-800 truncate">
-                              {bien ? `${propertyLabel(bien)}${bien.ville ? ` — ${bien.ville}` : ''}` : 'Bien non renseigné'}
-                            </h3>
-                            {index === 0 && items.length > 1 && (
-                              <span className="text-xs text-slate-400 whitespace-nowrap">
-                                {items.length} quittances
-                              </span>
-                            )}
-                          </div>
-
-                          <Link href={`/dashboard/quittances/${q.id}`} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 block hover:shadow-md transition-shadow h-full">
-                            <div className="flex items-start justify-between gap-3 mb-3">
-                              <div className="min-w-0">
-                                <h4 className="font-semibold text-slate-900 truncate">{formatLocataireName(locataire, '—')}</h4>
-                                {bien && <p className="text-xs text-slate-400 truncate">{propertyLabel(bien)} — {bien.ville}</p>}
-                              </div>
-                              <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full whitespace-nowrap ${q.envoyee ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                                {q.envoyee ? 'Envoyée' : 'À signer'}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-3 text-sm mt-3 pt-3 border-t border-slate-50">
-                              <span className="font-bold text-slate-900 whitespace-nowrap">{q.total.toLocaleString('fr-FR')} €</span>
-                              <span className="text-slate-400 text-xs text-right">{q.loyer_hc.toLocaleString('fr-FR')} HC + {q.charges.toLocaleString('fr-FR')} charges</span>
-                            </div>
-                            {!q.envoyee && (
-                              <div className="mt-3 w-full inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-medium">
-                                ✍🏿 Signer et envoyer
-                              </div>
-                            )}
-                          </Link>
-                        </div>
-                      )
-                    })
-                  })}
-                </div>
-              </section>
-            )
-          })}
-          {moisAffiches.length === 0 && (
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-10 text-center">
-              <p className="text-slate-500 text-sm">Aucune quittance pour ce mois.</p>
-            </div>
-          )}
-        </div>
-      )}
-      </div></div>
-    </div>
-  )
+type Quittance={id:string;locataire_id:string;bien_id:string|null;mois:string;total:number;envoyee:boolean;date_signature:string|null;caution_affichee?:boolean;caution_montant?:number;caution_total_inclus?:boolean;caution_encaissee?:number|null}
+type Locataire={id:string;nom:string;civilite:string|null;nom_famille:string|null;prenom:string|null;bien_id:string;bail_id?:string|null}
+type Payment={locataire_id:string;mois:string;montant:number;statut:string;caution_recue?:number|null}
+type Bail={id:string;caution?:number;caution_payee?:boolean}
+type Bien={id:string;nom:string;nom_personnalise?:string|null;ville:string;code_postal?:string|null}
+const monthLabel=(value:string)=>{const [y,m]=value.split('-');return new Date(Number(y),Number(m)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'})}
+const euro=(n:number)=>`${Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} €`
+export default function QuittancesPage(){
+ const [documents,setDocuments]=useState<Quittance[]>([]),[tenants,setTenants]=useState<Locataire[]>([]),[properties,setProperties]=useState<Bien[]>([]),[period,setPeriod]=useState(''),[search,setSearch]=useState(''),[property,setProperty]=useState(''),[status,setStatus]=useState(''),[payments,setPayments]=useState<Payment[]>([]),[baux,setBaux]=useState<Bail[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('')
+ useEffect(()=>{const db=createClient();Promise.all([db.from('quittances').select('*').order('mois',{ascending:false}),db.from('locataires').select('id, nom, civilite, nom_famille, prenom, bien_id, bail_id'),db.from('biens').select('*'),db.from('paiements').select('locataire_id,mois,montant,statut,caution_recue'),db.from('baux').select('id,caution,caution_payee')]).then(([q,l,b,p,ba])=>{if(q.error||l.error||b.error||p.error||ba.error)setError('Impossible de charger les quittances. Veuillez réessayer.');else{setDocuments(q.data||[]);setTenants(l.data||[]);setProperties(b.data||[]);setPayments(p.data||[]);setBaux(ba.data||[])}setLoading(false)}).catch(()=>{setError('Impossible de charger les quittances. Veuillez réessayer.');setLoading(false)})},[])
+ const tenantMap=useMemo(()=>new Map(tenants.map(x=>[x.id,x])),[tenants]),propertyMap=useMemo(()=>new Map(properties.map(x=>[x.id,x])),[properties]);const months=[...new Set(documents.map(x=>x.mois))].sort().reverse()
+ const filtered=documents.filter(q=>{const t=tenantMap.get(q.locataire_id),id=q.bien_id||t?.bien_id||'',b=propertyMap.get(id);return (!period||q.mois.startsWith(period))&&(!property||property===id)&&(!status||(status==='sent')===!!q.envoyee)&&(!search||`${formatLocataireName(t,'')} ${b?propertyLabel(b):''} ${q.id}`.toLocaleLowerCase('fr').includes(search.toLocaleLowerCase('fr')))})
+ const groups=[...new Set(filtered.map(q=>q.mois))].sort().reverse();const sent=filtered.filter(q=>q.envoyee).length
+ return <main className="receipts-ui"><header className="receipts-header"><div><h1>Quittances loyers</h1><p>Consultez, vérifiez et retrouvez vos documents de loyer.</p></div><Link className="receipts-primary" href="/dashboard/quittances/nouvelle">＋ <span>Créer une quittance</span></Link></header>
+ <PaymentPeriod months={months} value={period} onChange={setPeriod}/><div className="receipts-filters"><label><span className="sr-only">Rechercher</span><input placeholder="Rechercher un locataire ou une référence" value={search} onChange={e=>setSearch(e.target.value)}/></label><label><span className="sr-only">Bien</span><select value={property} onChange={e=>setProperty(e.target.value)}><option value="">Tous les biens</option>{properties.map(b=><option key={b.id} value={b.id}>{propertyLabel(b)}</option>)}</select></label><label><span className="sr-only">Envoi</span><select value={status} onChange={e=>setStatus(e.target.value)}><option value="">Tous les envois</option><option value="unsent">À signer</option><option value="sent">Signées et envoyées</option></select></label></div>
+ <div className="receipts-kpis"><div><span>▤</span><p><strong>{filtered.length}</strong> documents<small>{period.length===7?`pour ${monthLabel(period)}`:'pour la sélection'}</small></p></div><div><span>➤</span><p><strong>{filtered.length-sent}</strong> à signer<small>Non encore signées et envoyées</small></p></div><div><span>✓</span><p><strong>{sent}</strong> envoyées<small>Signées et envoyées</small></p></div></div>
+ {loading?<p>Chargement des quittances…</p>:error?<p role="alert">{error}</p>:groups.length===0?<div className="receipts-empty">Aucune quittance pour cette sélection.</div>:groups.map(m=><section key={m} className="receipts-group"><h2>▦　Documents de {monthLabel(m)}</h2><div className="receipts-list">{filtered.filter(q=>q.mois===m).map(q=>{const tenant=tenantMap.get(q.locataire_id),bien=propertyMap.get(q.bien_id||tenant?.bien_id||''),occupants=tenant?.bail_id?tenants.filter(t=>t.bail_id===tenant.bail_id).map(t=>t.id):[q.locataire_id],bail=baux.find(b=>b.id===tenant?.bail_id),financial=receiptPaymentTotals(q,payments.filter(p=>p.mois===q.mois&&occupants.includes(p.locataire_id)),Number(bail?.caution||0),!!bail?.caution_payee),unpaid=Math.max(0,Math.round((financial.total-financial.totalPaye)*100)/100);return <article className="receipt-card" key={q.id}><div className="receipt-icon">▤</div><div className="receipt-person"><strong>{formatLocataireName(tenant,'Locataire non renseigné')}</strong><p>⌂　{bien?propertyLabel(bien):'Bien non renseigné'}{bien&&propertyLocality(bien)?` · ${propertyLocality(bien)}`:''}</p><small>{q.date_signature?`Signée le ${new Date(`${q.date_signature.slice(0,10)}T12:00:00`).toLocaleDateString('fr-FR')}`:''}</small></div><div className="receipt-amount"><span>Échéance</span><strong>{euro(financial.total)}</strong><span>Payé : {euro(financial.totalPaye)}</span>{unpaid>0&&<span className="text-red-700">Impayé : {euro(unpaid)}</span>}<em className={q.envoyee?'sent':'pending'}>{q.envoyee?'✓ Signée et envoyée':'À signer'}</em></div><div className="receipt-actions"><a href={`/api/quittance-pdf?id=${encodeURIComponent(q.id)}&apercu=1`} target="_blank" rel="noopener noreferrer">Aperçu</a><a href={`/api/quittance-pdf?id=${encodeURIComponent(q.id)}`}>Télécharger</a><Link href={`/dashboard/quittances/${q.id}`}>Consulter</Link><Link href={`/dashboard/quittances/nouvelle?modifier=${encodeURIComponent(q.id)}`}>Modifier</Link></div></article>})}</div></section>)}
+ <div className="receipts-info"><strong>♢　Vérification par QR code</strong><p>Chaque document dispose d’une référence et d’un accès à sa version enregistrée.</p></div></main>
 }
