@@ -1,5 +1,6 @@
 'use client'
 import './paiements.css'
+import {propertyLocality} from '@/lib/propertyLocality'
 import {propertyLabel} from '@/lib/propertyNames'
 
 import {useRouter} from 'next/navigation'
@@ -26,7 +27,7 @@ type Paiement = {
 }
 
 type Locataire = { id: string; nom: string; civilite:string|null; nom_famille:string|null; prenom:string|null; bien_id: string; qualite_interne?:string|null }
-type Bien = { id: string; nom: string; nom_personnalise?: string | null; ville: string }
+type Bien = { id: string; nom: string; nom_personnalise?: string | null; ville: string; code_postal?:string|null }
 
 function formatMois(mois: string): string {
   const [year, month] = mois.split('-')
@@ -82,7 +83,7 @@ export default function PaiementsPage() {
   const locatairesMap = new Map(locataires.map((l) => [l.id, l]))
   const biensMap = new Map(biens.map((b) => [b.id, b]))
   const paiementsFiltres = filtreMois ? paiements.filter((p) => p.mois.startsWith(filtreMois)) : [...paiements]
-  const matchingPaiements=paiementsFiltres.filter(p=>{const l=locatairesMap.get(p.locataire_id),b=biensMap.get(p.bien_id)??(l?biensMap.get(l.bien_id):undefined),text=`${formatLocataireName(l,'')} ${b?.nom??''} ${b?.ville??''}`.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(),q=recherche.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();return (!q||text.includes(q))&&(!bienFiltre||b?.id===bienFiltre)&&(!statutFiltre||p.statut===statutFiltre)})
+  const matchingPaiements=paiementsFiltres.filter(p=>{const l=locatairesMap.get(p.locataire_id),b=biensMap.get(p.bien_id)??(l?biensMap.get(l.bien_id):undefined),text=`${formatLocataireName(l,'')} ${b?.nom??''} ${propertyLocality(b)}`.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(),q=recherche.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();return (!q||text.includes(q))&&(!bienFiltre||b?.id===bienFiltre)&&(!statutFiltre||p.statut===statutFiltre)})
   matchingPaiements.sort((a,b)=>b.mois.localeCompare(a.mois)||(biensMap.get(a.bien_id)?.nom??'').localeCompare(biensMap.get(b.bien_id)?.nom??'','fr')||formatLocataireName(locatairesMap.get(a.locataire_id),'').localeCompare(formatLocataireName(locatairesMap.get(b.locataire_id),''),'fr')||String(b.date_paiement??'').localeCompare(String(a.date_paiement??''))||a.id.localeCompare(b.id))
   const totalRecu = matchingPaiements.filter((p) => p.statut === 'recu' || p.statut === 'partiel').reduce((sum, p) => sum + Number(p.montant??0) + Number(p.caution_recue??0), 0)
   const moisDisponibles = Array.from(new Set(paiements.map((p) => p.mois))).sort((a, b) => b.localeCompare(a))
@@ -117,7 +118,7 @@ export default function PaiementsPage() {
             const statut = Number(p.montant)===0&&Number(p.caution_recue??0)===0?statutConfig.en_retard:statutConfig[p.statut]
             const datePaiement = new Date(p.date_paiement).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
             return <div key={p.id}>{(index===0||matchingPaiements[index-1].mois!==p.mois)&&<h2 className="px-4 py-2 bg-slate-50 text-sm font-semibold">{formatMois(p.mois)}</h2>}<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-4">
-              <div><p className="font-medium text-slate-900 text-sm">{formatLocataireName(locataire, '—')}</p><p className="text-xs text-slate-400">{bien ? `${propertyLabel(bien)} · ` : ''}{formatMois(p.mois)} · {datePaiement}</p>{Number(p.montant)===0&&<p className="text-xs text-amber-700 mt-1">Loyer du mois non payé</p>}{Number(p.solde_anterieur??0)>0&&<p className="text-xs text-amber-700">Solde antérieur : {Number(p.solde_anterieur).toLocaleString('fr-FR')} €</p>}{Number(p.caution_recue??0)>0&&<p className="text-xs text-slate-500">Caution encaissée : {Number(p.caution_recue).toLocaleString('fr-FR')} €</p>}{p.commentaire && <p className="text-xs text-slate-400 italic mt-0.5">{p.commentaire}</p>}</div>
+              <div><p className="font-medium text-slate-900 text-sm">{formatLocataireName(locataire, '—')}</p><p className="text-xs text-slate-400">{bien ? `${propertyLabel(bien)}${propertyLocality(bien)?` · ${propertyLocality(bien)}`:''} · ` : ''}{formatMois(p.mois)} · {datePaiement}</p>{Number(p.montant)===0&&<p className="text-xs text-amber-700 mt-1">Loyer du mois non payé</p>}{Number(p.solde_anterieur??0)>0&&<p className="text-xs text-amber-700">Solde antérieur : {Number(p.solde_anterieur).toLocaleString('fr-FR')} €</p>}{Number(p.caution_recue??0)>0&&<p className="text-xs text-slate-500">Caution encaissée : {Number(p.caution_recue).toLocaleString('fr-FR')} €</p>}{p.commentaire && <p className="text-xs text-slate-400 italic mt-0.5">{p.commentaire}</p>}</div>
               <div className="flex items-center gap-3 flex-shrink-0"><span className="font-bold text-slate-900 text-sm">{(Number(p.montant??0)+Number(p.caution_recue??0)).toLocaleString('fr-FR')} €</span><span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${statut.class}`}>{statut.label}</span><div className="flex items-center gap-1 ml-1"><button type="button" onClick={() => router.push(`/dashboard/paiements/nouveau?modifier=${encodeURIComponent(p.id)}`)} title="Modifier le paiement" className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.5-8.5a2.121 2.121 0 013 3L12 16l-4 1 1-4 8.5-8.5z" /></svg></button><button type="button" onClick={() => annulerPaiement(p)} title="Annuler le paiement" className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button></div></div>
             </div></div>
           })}
