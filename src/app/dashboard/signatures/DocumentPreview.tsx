@@ -1,0 +1,5 @@
+'use client'
+import {useEffect,useRef} from 'react'
+import {createPortal} from 'react-dom'
+import {FileText,X,ExternalLink} from 'lucide-react'
+export default function DocumentPreview({url,name,onClose}:{url:string;name:string;onClose:()=>void}){const dialog=useRef<HTMLDialogElement>(null);useEffect(()=>{const d=dialog.current;if(!d)return;d.showModal();const old=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{d.close();document.body.style.overflow=old}},[]);return createPortal(<dialog ref={dialog} className="docs-preview" aria-label={`Aperçu : ${name}`} onClose={onClose} onClick={e=>{if(e.target===e.currentTarget)onClose()}}><div className="docs-preview-body"><header><FileText size={23}/><div><h2>Aperçu du document</h2><p>{name}</p></div><button type="button" aria-label="Fermer l’aperçu" onClick={onClose}><X size={22}/></button></header><iframe title={`Aperçu : ${name}`} src={url}/><footer><p>Le fichier reste dans votre espace privé.</p><a href={url} target="_blank" rel="noopener noreferrer"><ExternalLink size={16}/> Ouvrir en plein écran</a></footer></div></dialog>,document.body)}
