@@ -1,5 +1,6 @@
 'use server'
 
+import {validChargeSelection} from '@/lib/chargeDetails'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { formatLocataireName } from '@/lib/locataireName'
@@ -14,6 +15,9 @@ export async function ajouterLocataire(formData: FormData) {
   const date_entree = formData.get('date_entree') as string
   const loyer_hc = parseFloat(formData.get('loyer_hc') as string) || 0
   const charges = parseFloat(formData.get('charges') as string) || 0
+  let detail_charges:unknown=[]
+  try { detail_charges=JSON.parse(String(formData.get('detail_charges')||'[]')) } catch { return {error:'Détail des charges invalide.'} }
+  if(!validChargeSelection(detail_charges))return {error:'Précisez le nom de la charge personnalisée.'}
   const cautionRaw = formData.get('caution') as string
   const caution = cautionRaw ? parseFloat(cautionRaw) : null
   const caution_payee = formData.get('caution_payee') === 'on'
@@ -51,7 +55,7 @@ export async function ajouterLocataire(formData: FormData) {
 
   const { data: bail, error: bailError } = await supabase.from('baux').insert({
     proprietaire_id: user.id, bien_id, lot_id, type_occupation: occupation,
-    date_entree, loyer_hc, charges, caution, caution_payee, duree_bail_ans,
+    date_entree, loyer_hc, charges, detail_charges, caution, caution_payee, duree_bail_ans,
     echeance_bail, mode_paiement: mode_paiement || null, commentaire: commentaire || null, actif: true,
   }).select('id').single()
   if (bailError || !bail) return { error: bailError?.message || 'Impossible de créer le bail' }

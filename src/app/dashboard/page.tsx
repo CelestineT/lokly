@@ -1,5 +1,5 @@
 'use client'
-import {Wallet,Receipt,ChartNoAxesCombined,House,Building2,Coins,Percent,TrendingUp,ChartPie,PiggyBank,FileText,TriangleAlert,ChevronRight,CalendarDays,Plus} from 'lucide-react'
+import {Wallet,Receipt,ChartNoAxesCombined,House,Building2,Euro,Percent,TrendingUp,ChartPie,PiggyBank,FileText,TriangleAlert,ChevronRight,CalendarDays,Plus} from 'lucide-react'
 import {periodCashFlow} from '@/lib/periodCashFlow'
 import {rentalVacancy} from '@/lib/rentalVacancy'
 import {netPropertyValue} from '@/lib/netPropertyValue'
@@ -76,7 +76,7 @@ export default function DashboardPage(){
  <K compact l="Rentabilité brute annualisée" v={loading?'…':lotMode||calc.rendement===null?'—':`${calc.rendement.toFixed(2)} %`} href="/dashboard/rentabilite"/>
  <K compact l={bienId?"TRI du bien":"TRI du parc"} v={loading?'…':triParc===null?'—':`${(triParc*100).toFixed(2)} %`} href="/dashboard/rentabilite" sub={lotMode?'Non ventilé par lot':triParc===null?'Données à compléter':undefined}/>
  </div>
- {bienId&&<div className="dashboard-current-rent"><K compact l={lotMode&&selectedLot&&!HAB_LOT.has(selectedLot.type)?"Loyer annexe / mois":"Loyers principaux HC / mois"} v={loading?'…':euro(currentRent)} href={selectedBien?`/dashboard/biens/${selectedBien.id}`:'/dashboard/biens'}/></div>}
+ {bienId&&<div className="dashboard-current-rent"><K compact l={lotMode&&selectedLot&&!HAB_LOT.has(selectedLot.type)?"Loyer annexe / mois":"Total Loyers Mensuel hors charges"} v={loading?'…':euro(currentRent)} href={selectedBien?`/dashboard/biens/${selectedBien.id}`:'/dashboard/biens'}/></div>}
  <section className="dashboard-tasks" aria-labelledby="dashboard-tasks-title"><h2 id="dashboard-tasks-title">À traiter</h2><Link href="/dashboard/paiements"><TriangleAlert className="task-warning" size={20}/><span>Paiements partiels <b>{loading?'…':scope.paiements.filter(p=>p.statut==='partiel').length}</b></span><ChevronRight size={15}/></Link><Link href="/dashboard/quittances"><FileText size={20}/><span>Quittances à envoyer <b>{loading?'…':scope.quittances.filter(q=>!q.envoyee).length}</b></span><ChevronRight size={15}/></Link></section>
  <div className="dashboard-charts"><RentProgression title="Progression des loyers" baux={baux} locataires={locs} affectations={affectations} from={from} to={to} bienId={bienId||undefined} lotId={lotId||undefined} loading={loading}/>
  <Chart title={lotMode?"Encaissements des baux liés":"Encaissements et dépenses"} data={calc.monthly} keys={lotMode?['recettes']:['recettes','depenses']}/>{!lotMode&&<Chart title="Cash-flow mensuel" data={calc.monthly} keys={['cash']}/>}
@@ -94,16 +94,16 @@ const dashboardTips:Record<string,string>={
  'Dépenses':'Total de toutes les dépenses enregistrées sur la période sélectionnée, quelle que soit leur catégorie.',
  'Charges':'Dépenses courantes d’exploitation : charges, assurances, gestion, taxes et travaux d’entretien ou de réparation.',
  'Taux de vacance':'Part des jours où les logements disponibles à la location sont restés sans bail pendant la période sélectionnée.',
- 'Rentabilité brute annualisée':'Loyers principaux hors charges actuels × 12 ÷ coût d’acquisition (prix et frais, hors éléments financés complémentaires) × 100.',
+ 'Rentabilité brute annualisée':'Total des loyers mensuels hors charges actuels × 12 ÷ coût d’acquisition (prix et frais, hors éléments financés complémentaires) × 100.',
  'TRI du bien':'Taux de rendement interne calculé avec les flux datés et la valeur actuelle du bien sélectionné. Il est indépendant de la période des encaissements affichés.',
  'Encaissements des baux liés':'Paiements reçus sur les baux liés au lot, charges et autres annexes comprises. Ils ne sont pas ventilés par lot.',
- 'Loyers principaux HC / mois':'Somme des loyers hors charges des baux actuellement en cours dans le périmètre choisi, comptés une seule fois par bail. Les annexes facturées à part ne sont pas incluses.',
+ 'Total Loyers Mensuel hors charges':'Somme des loyers hors charges des baux actuellement en cours dans le périmètre choisi, comptés une seule fois par bail. Les annexes facturées à part ne sont pas incluses.',
  'Loyer annexe / mois':'Prix mensuel actuellement rattaché à cette annexe, sans prorata sur la période sélectionnée.',
  'TRI du parc':'Taux de rendement interne consolidé du parc. Il mesure la performance globale des investissements à partir de tous les flux datés et des valeurs actuelles des biens. Ce n’est pas une moyenne des TRI individuels.',
  'Cash-flow après dette':'Recettes encaissées moins dépenses, mensualités de crédit et assurance emprunteur sur la période sélectionnée.'
 }
 function K({l,v,href,sub,compact=false,tone}:{l:string;v:string;href:string;sub?:string;compact?:boolean;tone?:'positive'|'negative'}){
- const tip=dashboardTips[l],Icon=l==='Recettes encaissées'||l==='Encaissements des baux liés'?Wallet:l==='Dépenses'?Receipt:l==='Cash-flow après dette'?ChartNoAxesCombined:l==='Logements'?House:l==='Biens hors logements'?Building2:l==='Charges'?Coins:l==='Rentabilité brute annualisée'?Percent:TrendingUp
+ const tip=dashboardTips[l],Icon=l==='Recettes encaissées'||l==='Encaissements des baux liés'?Wallet:l==='Dépenses'?Receipt:l==='Cash-flow après dette'?ChartNoAxesCombined:l==='Logements'?House:l==='Biens hors logements'?Building2:l==='Charges'?Euro:l==='Rentabilité brute annualisée'?Percent:TrendingUp
  const display=l==='Biens hors logements'?'Hors logements':l==='Rentabilité brute annualisée'?'Rentabilité brute':l
  return <Link href={href} className={`dashboard-stat ${compact?'dashboard-stat-compact':''} ${l==='Dépenses'?'is-expense':''} ${tone?`is-${tone}`:''}`}><span className="dashboard-icon" aria-hidden="true"><Icon/></span><div className="dashboard-stat-body"><div className="dashboard-stat-label"><span>{display}</span>{tip&&<span tabIndex={0} title={tip} aria-label={tip} className="dashboard-info">i</span>}</div><p className="dashboard-stat-value">{v}</p>{sub&&<p className="dashboard-stat-note" title={sub}>{sub}</p>}</div></Link>
 }

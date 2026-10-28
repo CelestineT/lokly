@@ -1,0 +1,1 @@
+export default function Loading(){return <div className="p-6" role="status" aria-live="polite"><div className="animate-pulse rounded-xl border border-blue-100 bg-white p-6 text-sm text-slate-600">Chargement de la page…</div></div>}

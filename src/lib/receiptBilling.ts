@@ -30,3 +30,10 @@ export function receiptPaymentTotals(q:any,payments:any[],legacyCaution=0,legacy
  const caution=q.caution_affichee?Number(q.caution_montant??legacyCaution):0,active=payments.filter(p=>['recu','partiel'].includes(p.statut)),rent=entryMoney(active.reduce((n,p)=>n+Number(p.montant??0),0)),tracked=active.some(p=>p.caution_recue!=null),deposit=q.caution_encaissee!=null?Number(q.caution_encaissee):tracked?active.reduce((n,p)=>n+Number(p.caution_recue??0),0):(legacyPaid?caution:0)
  return{total:entryMoney(Number(q.total??0)+(q.caution_total_inclus?0:caution)),totalPaye:entryMoney(rent+(q.caution_affichee?deposit:0))}
 }
+
+/** A building's total area must never stand in for an individual dwelling. */
+export function receiptSurface(bien:{type?:string|null;surface_m2?:number|string|null}|null|undefined,lot:{surface_m2?:number|string|null}|null|undefined):number|undefined{
+ const value=lot?lot.surface_m2:['immeuble','immeuble_rapport'].includes(bien?.type??'')?undefined:bien?.surface_m2
+ if(value==null||String(value).trim()==='')return undefined
+ const number=Number(value);return Number.isFinite(number)&&number>0?number:undefined
+}

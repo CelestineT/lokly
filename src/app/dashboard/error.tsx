@@ -1,0 +1,2 @@
+'use client'
+export default function ErrorPage({reset}:{error:Error&{digest?:string};reset:()=>void}){return <section className="m-4 rounded-2xl border border-blue-100 bg-white p-6"><h2 className="text-lg font-semibold text-slate-900">La page n’a pas pu être chargée</h2><p className="mt-2 text-sm text-slate-500">Vérifiez votre connexion puis réessayez.</p><button type="button" onClick={reset} className="mt-4 rounded-xl bg-blue-700 px-4 py-2 text-sm text-white">Réessayer</button></section>}
