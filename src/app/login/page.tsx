@@ -45,7 +45,7 @@ export default function LoginPage() {
     <main className="min-h-screen bg-[#f1f7fd] text-[#080d49] lg:grid lg:grid-cols-[minmax(380px,46%)_1fr]">
       <section className="relative overflow-hidden bg-[#08075a] px-6 pt-10 pb-16 text-white sm:px-12 lg:min-h-screen lg:flex lg:flex-col lg:justify-between lg:px-16 lg:py-16">
         <div className="relative z-10 mx-auto max-w-xl text-center lg:mx-0 lg:text-left">
-          <a href="https://ekolocs.fr" target="_blank" rel="noopener noreferrer" title="Ouvrir le site vitrine — nouvel onglet" aria-label="Ekolocs — site vitrine, nouvel onglet" className="inline-block"><img src="/ekolocs-logo.jpeg" alt="Ekolocs, parc immobilier" className="mx-auto h-auto w-52 rounded-lg bg-white p-2 lg:mx-0 lg:w-64" /><span className="mt-2 block text-center text-xs text-blue-100">Site vitrine ↗</span></a>
+          <a href="https://ekolocs.fr" target="_blank" rel="noopener noreferrer" title="Ouvrir le site vitrine — nouvel onglet" aria-label="Ekolocs — site vitrine, nouvel onglet" className="inline-block"><img src="/ekolocs-logo.jpeg" alt="Ekolocs, parc immobilier" className="mx-auto h-auto w-52 rounded-lg bg-white p-2 lg:mx-0 lg:w-64" /></a><a href="https://ekolocs.fr" target="_blank" rel="noopener noreferrer" title="Ouvrir le site Ekolocs dans un nouvel onglet" className="mt-3 hidden items-center gap-2 text-xs text-blue-100 underline lg:flex">Voir le site Ekolocs ↗</a>
           <h1 className="mt-9 text-3xl font-bold leading-tight sm:text-4xl lg:mt-14 lg:text-5xl">Votre parc immobilier,<br />en toute clarté.</h1>
           <p className="mt-5 hidden max-w-lg text-lg text-blue-100 lg:block">Retrouvez vos biens, vos locataires et votre suivi financier dans un même espace.</p>
         </div>
@@ -66,7 +66,7 @@ export default function LoginPage() {
           {mode==='login'&&<div className="mt-4 text-right text-sm"><a href="/recuperer" className="text-blue-700 underline">Mot de passe oublié ?</a></div>}
           <div className="mt-6 border-t border-slate-200 pt-5 text-center text-sm text-slate-500">{mode==='login'?<>Pas encore de compte ? <button type="button" onClick={()=>{setMode('signup');setError(null);setSuccess(null)}} className="font-medium text-blue-700 underline">S’inscrire</button></>:<>Déjà un compte ? <button type="button" onClick={()=>{setMode('login');setError(null);setSuccess(null)}} className="font-medium text-blue-700 underline">Se connecter</button></>}</div>
         </div>
-        <div className="mx-auto mt-8 text-center text-sm"><a href="https://ekolocs.fr" target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 underline">Retour au site Ekolocs ↗</a></div>
+        <div className="mx-auto mt-8 text-center text-sm"><a href="https://ekolocs.fr" target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 underline">Voir le site Ekolocs ↗</a></div>
       </section>
     </main>
   )

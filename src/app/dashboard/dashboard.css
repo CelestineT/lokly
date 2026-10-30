@@ -16,4 +16,4 @@
 
 @media(min-width:768px) and (max-width:1100px){.dashboard-primary{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-charts{grid-template-columns:1fr}}
 
-.ekolocs-brand-hint{display:block;text-align:center;font-size:10px;color:#2514b4;margin-top:3px;font-weight:600}.ekolocs-mobile-header a .ekolocs-brand-hint{font-size:9px;margin-top:1px;color:#e3eaff}.ekolocs-brand img{height:45px}
+.ekolocs-brand{margin-bottom:0}.ekolocs-brand img{height:52px;object-fit:contain}.ekolocs-website-desktop{display:flex;justify-content:center;align-items:center;gap:6px;font-size:11px;color:#d8dfff;padding:12px 3px 16px}.ekolocs-website-desktop:hover{color:white;text-decoration:underline}.ekolocs-nav .ekolocs-website-mobile{display:none}.ekolocs-website-desktop:focus-visible{outline:2px solid #9bbcff;outline-offset:2px;border-radius:4px}@media(max-width:767px){.ekolocs-website-desktop{display:none}.ekolocs-nav .ekolocs-website-mobile{display:flex;border-top:1px solid #ffffff25;margin-top:8px;padding-top:15px}.ekolocs-mobile-header img{object-fit:contain}}
