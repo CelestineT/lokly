@@ -11,7 +11,11 @@ export type VacancyUnit={id:string|null;bien_id:string;label:string;availableDay
 export function rentalVacancy({biens,lots,baux,locataires,from,to,lotId,today=rentalDate()}:{biens:Property[];lots:Unit[];baux:Lease[];locataires:Tenant[];from:string;to:string;lotId?:string;today?:string}){
  const endDate=to<today?to:today,start=calendarDay(from),end=calendarDay(endDate),units:VacancyUnit[]=[]
  if(start===null||end===null||calendarDay(to)===null||calendarDay(today)===null||start>end)return {rate:null,availableDays:0,emptyDays:0,units,issues:['Période d’observation invalide.'],from,to:endDate}
- const leases=[...new Map(baux.map(b=>[b.id,b])).values()],leaseIds=new Set(leases.map(b=>b.id)),members=new Set(locataires.map(t=>t.bail_id).filter(Boolean)),legacy=new Map<string,Tenant[]>()
+ const stored=[...new Map(baux.map(b=>[b.id,b])).values()],members=new Set(locataires.map(t=>t.bail_id).filter(Boolean))
+ // An unlinked copy of the same valid occupancy cannot add vacant or occupied days.
+ // Keep every distinct or ambiguous orphan visible; never mutate stored history.
+ const valid=(b:Lease)=>calendarDay(b.date_entree)!==null&&(!b.date_sortie||calendarDay(b.date_sortie)!==null&&b.date_sortie>=b.date_entree!)&&!(b.actif===false&&!b.date_sortie)
+ const leases=stored.filter(b=>members.has(b.id)||!valid(b)||!stored.some(other=>members.has(other.id)&&valid(other)&&other.bien_id===b.bien_id&&(other.lot_id??null)===(b.lot_id??null)&&other.date_entree===b.date_entree&&(other.date_sortie??null)===(b.date_sortie??null)&&(other.actif??null)===(b.actif??null))),leaseIds=new Set(stored.map(b=>b.id)),legacy=new Map<string,Tenant[]>()
  for(const t of locataires){if(t.bail_id&&leaseIds.has(t.bail_id))continue;const k=t.bail_id??t.id;legacy.set(k,[...(legacy.get(k)??[]),t])}
  // Without a surviving lease, use each occupant's actual dates. The union below
  // counts couples only once but preserves gaps and different dwelling IDs.
