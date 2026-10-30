@@ -22,8 +22,8 @@ export async function POST(req: NextRequest) {
 
   const locataire = quittance.locataires as { nom: string; email: string; bail_id?: string }
   const bien = quittance.biens as { nom?: string; adresse: string; ville: string; type?: string }
-  const { data: profile } = await supabase.from('profiles').select('nom,prenom,telephone,signature_base64,iban,bic').eq('id', user.id).single()
-  const proprietaireNom = `${profile?.prenom ?? ''} ${profile?.nom ?? ''}`.trim() || user.email || 'Le propriétaire'
+  const { data: profile } = await supabase.from('profiles').select('email,nom,prenom,telephone,signature_base64,iban,bic').eq('id', user.id).single()
+  const proprietaireNom = `${profile?.prenom ?? ''} ${profile?.nom ?? ''}`.trim() || 'Le propriétaire'
 
   let lot: any = null
   if (locataire?.bail_id) {
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     locataireNom: cleanPdfText(locataire.nom),
     locataireEmail: cleanPdfText(locataire.email),
     proprietaireNom: cleanPdfText(proprietaireNom),
-    proprietaireEmail: cleanPdfText(user.email ?? ''),
+    proprietaireEmail: cleanPdfText(profile?.email ?? ''),
     proprietaireTelephone: cleanPdfText(profile?.telephone ?? ''),
     bienNom: cleanPdfText(bien?.nom ?? ''),
     bienAdresse: cleanPdfText(bien?.adresse ?? ''),
