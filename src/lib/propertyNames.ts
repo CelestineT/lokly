@@ -4,6 +4,9 @@ export function propertyLabel(bien:PropertyName|null|undefined){return [bien?.no
 // Older forms omit this field. Before the migration, an empty new field must
 // also leave the existing property writable without referencing a missing column.
 export function propertyNamePatch(fd:FormData){
+ const type=String(fd.get('type')??'')
+ if(type==='autre'&&!String(fd.get('nom_personnalise')??'').trim())throw new Error('Précisez le type de bien « Autre ».')
+ if(fd.get('lots_json')){let lots;try{lots=JSON.parse(String(fd.get('lots_json')))}catch{throw new Error('Le détail des lots est invalide.')};if(Array.isArray(lots)&&lots.some(l=>!l||typeof l!=='object'||((l.type==='autre'||l.type_lot==='autre')&&!String(l.nom_personnalise??'').trim())))throw new Error('Précisez le type de chaque lot « Autre ».')}
  if(!fd.has('nom_personnalise'))return{}
  const value=String(fd.get('nom_personnalise')??'').trim()
  if(value.length>120)throw new Error('L’intitulé personnalisé ne doit pas dépasser 120 caractères.')

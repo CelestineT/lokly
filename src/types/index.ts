@@ -60,7 +60,7 @@ export type Depense = {
   id: string
   proprietaire_id: string
   bien_id: string
-  categorie: 'credit' | 'assurance' | 'taxe_fonciere' | 'travaux' | 'gestion' | 'autre'
+  categorie: 'credit' | 'assurance' | 'taxe_fonciere' | 'travaux' | 'gestion' | 'charges' | 'taxe' | 'frais_copropriete' | 'charge_copropriete' | 'autre' | `autre:${string}`
   libelle: string
   montant: number
   date: string
