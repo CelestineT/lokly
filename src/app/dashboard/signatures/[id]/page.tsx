@@ -1,4 +1,6 @@
 'use client'
+import {FormHeader,FormSection} from '@/components/FormPage'
+import {Download,Eye} from 'lucide-react'
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -62,14 +64,10 @@ export default function SignaturePage() {
 
   const details=Array.isArray(quittance.lots_annexes_detail)?quittance.lots_annexes_detail:[]
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <button onClick={() => router.back()} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 mb-6">← Retour</button>
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Quittance de loyer</h1>
-      <p className="text-slate-500 text-sm mb-6">{locataire.nom} — {formatMois(quittance.mois)}</p>
-
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 mb-6">
-        <h2 className="font-semibold text-slate-800 mb-4 text-sm uppercase tracking-wide">Aperçu</h2>
-        <div className="space-y-2 text-sm">
+    <div className="form-page">
+      <FormHeader title="Quittance de loyer" description={`${locataire.nom} — ${formatMois(quittance.mois)}`} backHref="/dashboard/signatures" backLabel="Retour aux documents" icon="file"/>
+      <FormSection title="Informations du document" icon="file">
+        <div className="form-page-receipt text-sm">
           <Row label="Locataire" value={locataire.nom}/>
           <Row label="Email" value={locataire.email}/>
           <Row label="Bien" value={`${bien?.nom ?? '—'}${bien?.ville ? ` — ${bien.ville}` : ''}`}/>
@@ -81,9 +79,9 @@ export default function SignaturePage() {
           {Number(quittance.solde)!==0&&<Row label="Solde" value={`${Number(quittance.solde).toLocaleString('fr-FR')} €`}/>} 
           <div className="border-t border-slate-100 pt-2 flex justify-between font-bold"><span>Total</span><span>{Number(quittance.total).toLocaleString('fr-FR')} €</span></div>
         </div>
-      </div>
+      </FormSection>
 
-      <button onClick={downloadPDF} className="w-full inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-3 text-sm font-medium hover:bg-blue-700">↓ Télécharger la quittance PDF</button>
+      <div className="form-page-footer mt-5"><a href={`/api/quittance-pdf?id=${encodeURIComponent(quittance.id)}&apercu=1`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2"><Eye size={18}/> Aperçu du PDF</a><button onClick={downloadPDF} className="inline-flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-4 py-3 text-sm font-medium hover:bg-blue-700"><Download size={18}/> Télécharger la quittance PDF</button></div>
       <p className="text-xs text-slate-400 text-center mt-3">Le téléchargement utilise le même modèle de quittance que l’envoi par e-mail.</p>
     </div>
   )

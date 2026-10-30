@@ -1,5 +1,6 @@
 import {House,UserRound,ChevronDown} from 'lucide-react'
 import './dashboard.css'
+import './form-pages.css'
 import Sidebar from '@/components/Sidebar'
 import MobileInfoTooltips from '@/components/MobileInfoTooltips'
 
