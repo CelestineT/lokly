@@ -66,7 +66,7 @@ export default function DashboardPage(){
  <K l={lotMode?"Encaissements des baux liés":"Recettes encaissées"} v={loading?'…':euro(calc.recettes)} href="/dashboard/paiements" sub="Sur la période sélectionnée"/>
  <K l="Dépenses" v={loading?'…':lotMode?'—':euro(calc.depenses)} href="/dashboard/depenses" sub={lotMode?'Non ventilées par lot':'Sur la période sélectionnée'}/>
  <K l="Cash-flow après dette" v={loading?'…':lotMode?'—':euro(calc.cash)} href="/dashboard/rentabilite" sub={lotMode?'Non ventilé par lot':'Après crédit et assurance'} tone={calc.cash<0?'negative':'positive'}/>
- <K l="Taux de vacance" v={loading?'…':calc.vacance===null?'—':`${calc.vacance.toFixed(1)} %`} href="#vacancy-diagnostics" sub={vacancyInfo.issues.length?'Données de bail à vérifier':'Sur les logements disponibles'} help={`Jours-logements sans bail ÷ jours-logements disponibles. Dates d’entrée et de sortie incluses ; calcul arrêté au plus tard aujourd’hui. ${vacancyInfo.issues.length?'Consultez « Vérifier le taux de vacance » : '+vacancyInfo.issues.join(' '):`${vacancyInfo.emptyDays} jours-logements vacants sur ${vacancyInfo.availableDays} disponibles.`}`}/>
+ <K l="Taux de vacance" v={loading?'…':calc.vacance===null?'—':`${calc.vacance.toFixed(1)} %`} href="#vacancy-diagnostics" sub={vacancyInfo.issues.length?'Données de bail à vérifier':'Sur les logements disponibles'} help="Part des jours où les logements disponibles sont restés sans bail pendant la période sélectionnée."/>
 
  </div>
  <div className="dashboard-secondary">
