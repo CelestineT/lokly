@@ -2,6 +2,7 @@
 import {Wallet,Receipt,ChartNoAxesCombined,House,Building2,Euro,Percent,TrendingUp,ChartPie,PiggyBank,FileText,TriangleAlert,ChevronRight,CalendarDays,Plus} from 'lucide-react'
 import {periodCashFlow} from '@/lib/periodCashFlow'
 import {expenseCategoryLabel,expenseCategoryKey} from '@/lib/expenseCategories'
+import PreRentalMetric from '@/components/PreRentalMetric'
 import {preRentalPeriod} from '@/lib/preRentalPeriod'
 import {rentalVacancy} from '@/lib/rentalVacancy'
 import {netPropertyValue} from '@/lib/netPropertyValue'
@@ -44,7 +45,7 @@ export default function DashboardPage(){
  const lotMode=!!lotId,selectedLot=lots.find(l=>l.id===lotId),selectedBien=biens.find(b=>b.id===bienId),unitName=(l:Lot)=>[l.type.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase()),l.nom_personnalise?.trim()||l.numero_lot||'Lot'].join(' — ')
  const totals=useMemo(()=>rentalTotals({baux,locataires:locs,affectations,bienId:bienId||undefined,lotId:lotId||undefined}),[baux,locs,affectations,bienId,lotId])
  const vacancyInfo=useMemo(()=>rentalVacancy({biens:scope.biens,lots:scope.lots,baux:scope.baux,locataires:scope.locataires,from,to,lotId:lotId||undefined}),[scope,from,to,lotId])
- const preparation=preRentalPeriod({biens:scope.biens,lots:scope.lots,baux:[...scope.baux,...scope.locataires],from,to,today:rentalDate(),lotId:lotId||undefined})
+ const preparation=preRentalPeriod({biens:scope.biens,lots:scope.lots,baux:[...scope.baux.filter(b=>scope.locataires.some(t=>t.bail_id===b.id)),...scope.locataires],from,to,today:rentalDate(),lotId:lotId||undefined})
  const netItems=scope.biens.map(b=>netPropertyValue(b,scope.financements.filter(f=>f.bien_id===b.id))),netComplete=netItems.length>0&&netItems.every(x=>x.value!==null),netValue=netItems.length===1?netItems[0]:{value:netComplete?netItems.reduce((s,x)=>s+x.value!,0):null,remainingDebt:netComplete?netItems.reduce((s,x)=>s+x.remainingDebt!,0):null,reason:netComplete?null:'Complétez la valeur et le financement de chaque bien.',at:rentalDate(),valuationDate:null}
  const currentRent=lotMode&&selectedLot&&!HAB_LOT.has(selectedLot.type)?totals.totalHC:totals.principalHC
  const scopeNote='Les dépenses, le crédit et la valeur de l’immeuble ne sont pas ventilés par lot. Le cash-flow, les dépenses et les rendements du lot ne peuvent donc pas être calculés.'
@@ -81,7 +82,7 @@ export default function DashboardPage(){
  <K compact l={bienId?"TRI du bien":"TRI du parc"} v={loading?'…':triParc===null?'—':`${(triParc*100).toFixed(2)} %`} href="/dashboard/rentabilite" sub={lotMode?'Non ventilé par lot':triParc===null?'Données à compléter':undefined}/>
  </div>
  {bienId&&<div className="dashboard-current-rent"><K compact l={lotMode&&selectedLot&&!HAB_LOT.has(selectedLot.type)?"Loyer annexe / mois":"Total Loyers Mensuel hors charges"} v={loading?'…':euro(currentRent)} href={selectedBien?`/dashboard/biens/${selectedBien.id}`:'/dashboard/biens'}/></div>}
- {!loading&&valid&&(preparation.count>0||preparation.missing>0)&&<div className="dashboard-current-rent"><K compact l="Avant mise en location" v={`${preparation.days} jours-logements`} sub={`${preparation.count} logement(s) sur la période${preparation.missing?' · Dates d’acquisition à compléter':''}`} href="/dashboard/biens" help="Jours entre l’acquisition et la disponibilité à la location, sur la période sélectionnée. Les jours des logements sont additionnés. Cet indicateur est distinct de la vacance locative et ne présume pas du motif (travaux, usage personnel…)."/></div>}
+ {!loading&&<PreRentalMetric result={preparation}/>}
  <section className="dashboard-tasks" aria-labelledby="dashboard-tasks-title"><h2 id="dashboard-tasks-title">À traiter</h2><Link href="/dashboard/paiements"><TriangleAlert className="task-warning" size={20}/><span>Paiements partiels <b>{loading?'…':scope.paiements.filter(p=>p.statut==='partiel').length}</b></span><ChevronRight size={15}/></Link><Link href="/dashboard/quittances"><FileText size={20}/><span>Quittances à envoyer <b>{loading?'…':scope.quittances.filter(q=>!q.envoyee).length}</b></span><ChevronRight size={15}/></Link></section>
  <div className="dashboard-charts"><RentProgression title="Progression des loyers" baux={baux} locataires={locs} affectations={affectations} from={from} to={to} bienId={bienId||undefined} lotId={lotId||undefined} loading={loading}/>
  <Chart title={lotMode?"Encaissements des baux liés":"Encaissements et dépenses"} data={calc.monthly} keys={lotMode?['recettes']:['recettes','depenses']}/>{!lotMode&&<Chart title="Cash-flow mensuel" data={calc.monthly} keys={['cash']}/>}

@@ -14,7 +14,7 @@ export function leaseAmounts<T extends RentalAssignment>(source:RentSource,rows:
 /** A lease without any surviving occupant is not an ongoing rental. Legacy tenant records without a matching lease remain supported. */
 export function rentalTotals({baux,locataires=[],affectations=[],bienId,lotId,at=rentalDate()}:{baux:RentalSource[];locataires?:RentalSource[];affectations?:RentalAssignment[];bienId?:string;lotId?:string;at?:string}){
  const members=new Map<string,RentalSource[]>();for(const tenant of locataires){if(tenant.bail_id)members.set(tenant.bail_id,[...(members.get(tenant.bail_id)??[]),tenant])}
- const leases=new Map(baux.map(b=>[b.id,b])),contracts:RentalSource[]=[...leases.values()].filter(b=>members.has(b.id))
+ const leases=new Map(baux.map(b=>{const group=members.get(b.id)??[],propertyIds=[...new Set(group.map(t=>t.bien_id).filter(Boolean))];return [b.id,{...b,bien_id:b.bien_id??(propertyIds.length===1?propertyIds[0]:null)}]})),contracts:RentalSource[]=[...leases.values()].filter(b=>members.has(b.id))
  const fallback=new Map<string,RentalSource[]>();for(const tenant of locataires){if(tenant.bail_id&&leases.has(tenant.bail_id))continue;const key=tenant.bail_id?`bail:${tenant.bail_id}`:`loc:${tenant.id}`;fallback.set(key,[...(fallback.get(key)??[]),tenant])}
  for(const [id,group]of fallback){const principal=rentalPrincipal(group,at);contracts.push({...principal,id,bail_id:principal.bail_id??null})}
  const active=contracts.filter(b=>rentalIsCurrent(b,at)&&(!leases.has(b.id)||(members.get(b.id)??[]).some(t=>rentalIsCurrent(t,at)))&&(!bienId||b.bien_id===bienId))
@@ -22,5 +22,6 @@ export function rentalTotals({baux,locataires=[],affectations=[],bienId,lotId,at
  const activeLeaseIds=new Set(active.flatMap(b=>{const id=b.bail_id??(leases.has(b.id)?b.id:null);return id?[id]:[]})),principalLots=new Set(active.map(b=>b.lot_id).filter(Boolean))
  const annexes=annexesAt(affectations.filter(a=>activeLeaseIds.has(a.bail_id)&&(!lotId||a.lot_id===lotId)&&!principalLots.has(a.lot_id)),at)
  const principalHC=amount(rows.reduce((s,r)=>s+amount(r.loyer_hc),0)),charges=amount(rows.reduce((s,r)=>s+amount(r.charges),0)),annexesTotal=amount(annexes.reduce((s,a)=>s+amount(a.prix_mensuel),0))
- return{rows,annexes,principalHC,charges,annexesTotal,totalHC:amount(principalHC+annexesTotal),totalCC:amount(principalHC+charges+annexesTotal)}
+ const excluded=contracts.filter(b=>(!bienId||b.bien_id===bienId)&&(!lotId||b.lot_id===lotId)&&!active.includes(b)).map(b=>{const group=members.get(b.id)??[],member=group.find(t=>t.est_principal)??group[0]??b;const reason=b.actif===false?'Bail marqué terminé ou inactif.':b.date_entree&&b.date_entree>at?`Bail à venir : entrée le ${b.date_entree.split('-').reverse().join('/')}.`:b.date_sortie&&b.date_sortie<at?`Bail terminé le ${b.date_sortie.split('-').reverse().join('/')}.`:'Aucun occupant en cours à cette date.';return {id:b.id,label:member.nom??'Locataire',reason,href:member.id&&locataires.some(t=>t.id===member.id)?`/dashboard/locataires/${member.id}/modifier-bail`:null}})
+ return{rows,annexes,excluded,principalHC,charges,annexesTotal,totalHC:amount(principalHC+annexesTotal),totalCC:amount(principalHC+charges+annexesTotal)}
 }

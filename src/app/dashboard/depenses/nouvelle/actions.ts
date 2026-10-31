@@ -1,4 +1,5 @@
 'use server'
+import {randomUUID} from 'crypto'
 import {createClient} from '@/lib/supabase/server'
 import {revalidatePath} from 'next/cache'
 import {expenseDates,validExpenseDate} from '@/lib/expenseSchedule'
@@ -11,5 +12,5 @@ export async function ajouterDepense(form:FormData){
  if(recurrente&&!['mensuelle','trimestrielle','semestrielle','annuelle'].includes(periodicite??''))return{error:'Choisissez la périodicité.'}
  if(categorie==='travaux'&&(!typeTravaux||typeTravaux==='Autre'||typeTravaux.length>120))return{error:'Choisissez et précisez le type de travaux.'}
  if(bien){const{data,error}=await s.from('biens').select('id').eq('id',bien).eq('proprietaire_id',user.id).maybeSingle();if(error||!data)return{error:'Ce bien est introuvable ou inaccessible.'}}
- const rows=dates.map(date=>({proprietaire_id:user.id,bien_id:bien,categorie,montant:Number(montant),date_depense:date,description:String(form.get('description')??'').trim()||null,recurrente,periodicite,type_travaux:typeTravaux,deductible_fiscalement:form.get('deductible_fiscalement')==='on'})); const {error}=await s.from('depenses').insert(rows.length===1?rows[0]:rows);if(error)return{error:error.message};revalidatePath('/dashboard','layout');return{ok:true}
+ const rows=dates.map(date=>({id:randomUUID(),proprietaire_id:user.id,bien_id:bien,categorie,montant:Number(montant),date_depense:date,description:String(form.get('description')??'').trim()||null,recurrente,periodicite,type_travaux:typeTravaux,deductible_fiscalement:form.get('deductible_fiscalement')==='on'})); const {error}=await s.from('depenses').insert(rows.length===1?rows[0]:rows);if(error)return{error:error.message};revalidatePath('/dashboard','layout');return{ok:true,id:rows[0].id}
 }
