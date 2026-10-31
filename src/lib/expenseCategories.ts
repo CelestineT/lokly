@@ -1,6 +1,6 @@
 export const EXPENSE_CATEGORIES:Record<string,string>={travaux:'Travaux',charges:'Charges',frais_copropriete:'Frais de Copropriété',charge_copropriete:'Charge de Copropriété',assurance:'Assurance',gestion:'Gestion',taxe:'Taxes',autre:'Autre'}
 const PREFIX='autre:'
-export const expenseCategoryKey=(value:string)=>value.startsWith(PREFIX)?'autre':value
+export const expenseCategoryKey=(value:string)=>{if(value.startsWith(PREFIX))return 'autre';const key=value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/[’']/g,' ').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');return ({charges_de_copropriete:'charge_copropriete',charges_copropriete:'charge_copropriete',charge_de_copropriete:'charge_copropriete',frais_de_copropriete:'frais_copropriete'} as Record<string,string>)[key]??key}
 export const expenseCustomName=(value:string)=>value.startsWith(PREFIX)?value.slice(PREFIX.length):''
-export const expenseCategoryLabel=(value:string)=>expenseCustomName(value)||EXPENSE_CATEGORIES[value]||value
+export const expenseCategoryLabel=(value:string)=>expenseCustomName(value)||EXPENSE_CATEGORIES[expenseCategoryKey(value)]||value
 export function expenseCategoryFromForm(form:FormData){const category=String(form.get('categorie')??'');if(!Object.hasOwn(EXPENSE_CATEGORIES,category))throw Error('Choisissez une catégorie de dépense.');if(category!=='autre')return category;const name=String(form.get('categorie_autre')??'').trim();if(!name||name.length>120)throw Error('Précisez la dépense « Autre » (120 caractères maximum).');return PREFIX+name}

@@ -6,8 +6,9 @@ export function expenseDates(form:FormData):string[]{
  const year=Number(form.get('annee')),day=Number(form.get('jour_mensuel'))
  if(!Number.isInteger(year)||year<1900||year>2100)throw Error('Renseignez une année valide (1900 à 2100).')
  let months:number[]
- if(frequency==='mensuelle'){if(!Number.isInteger(day)||day<1||day>31)throw Error('Choisissez un jour de prélèvement entre 1 et 31.');months=Array.from({length:12},(_,i)=>i+1)}
+ if(frequency==='mensuelle'){if(!Number.isInteger(day)||day<1||day>31)throw Error('Choisissez un jour de prélèvement entre 1 et 31.');const first=String(form.get('debut_mensualites')??'');if(!validExpenseDate(first)||Number(first.slice(0,4))!==year)throw Error('Renseignez une date de début dans l’année choisie.');months=Array.from({length:12},(_,i)=>i+1).filter(m=>m>=Number(first.slice(5,7)))}
  else {months=form.getAll('mois_prelevement').map(Number);const count=frequency==='trimestrielle'?4:2,step=12/count;months.sort((a,b)=>a-b);if(months.length!==count||new Set(months).size!==count||months.some(m=>!Number.isInteger(m)||m<1||m>12)||months.slice(1).some((m,i)=>m-months[i]!==step))throw Error(`Choisissez ${count} mois espacés de ${step} mois.`)}
- return months.map(month=>`${year}-${String(month).padStart(2,'0')}-${String(frequency==='mensuelle'?Math.min(day,new Date(Date.UTC(year,month,0)).getUTCDate()):1).padStart(2,'0')}`)
+ const dates=months.map(month=>`${year}-${String(month).padStart(2,'0')}-${String(frequency==='mensuelle'?Math.min(day,new Date(Date.UTC(year,month,0)).getUTCDate()):1).padStart(2,'0')}`)
+ return frequency==='mensuelle'?dates.filter(date=>date>=String(form.get('debut_mensualites'))):dates
 }
 export function validExpenseDate(date:string){const d=new Date(`${date}T12:00:00Z`);return /^\d{4}-\d{2}-\d{2}$/.test(date)&&Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===date}
