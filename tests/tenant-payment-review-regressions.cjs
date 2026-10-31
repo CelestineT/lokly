@@ -1,0 +1,16 @@
+const assert=require('assert'),{loadSource}=require('./source-loader.cjs'),{tenantPaymentReview:review,paymentDeadline}=loadSource('src/lib/tenantPaymentReview.ts'),{paymentSchedule}=loadSource('src/lib/paymentSchedule.ts');
+assert.equal(paymentDeadline('Avant le 5','2026-10'),'2026-10-04');assert.equal(paymentDeadline('Le 31 de chaque mois','2026-02'),'2026-02-28');assert.equal(paymentDeadline('virement','2026-10'),null);
+const lease={id:'b',bien_id:'B',date_entree:'2026-10-01',loyer_hc:850,charges:0,mode_paiement:'Avant le 5'},members=[{id:'a',bail_id:'b',bien_id:'B',qualite_interne:'RAS'},{id:'c',bail_id:'b',bien_id:'B'}];
+const p=(id,amount,date)=>({locataire_id:id,mois:'2026-10',statut:'partiel',montant:amount,date_paiement:date,detail_echeance:{total:850}});
+let x=review(lease,members,[],[p('a',400,'2026-10-02'),p('c',450,'2026-10-04')],[],'2026-10-31');assert.equal(x.onTime,1);assert.equal(x.score,100);assert.equal(x.rows.length,1,'Un couple ne double pas les échéances');
+x=review(lease,members,[],[p('a',400,'2026-10-02'),p('c',450,'2026-10-05')],[],'2026-10-31');assert.equal(x.late,1);assert.equal(x.score,0);
+x=review(lease,members,[],[p('a',400,'2026-10-02')],[],'2026-10-31');assert.equal(x.unpaid,1);
+x=review(lease,members,[],[p('a',850,null)],[],'2026-10-31');assert.equal(x.unknown,1);assert.equal(x.score,null);
+x=review({...lease,mode_paiement:'virement'},members,[],[p('a',850,'2026-10-02')],[],'2026-10-31');assert.equal(x.unknown,1);assert.equal(x.score,null);
+x=review(lease,members,[],[],[],'2026-10-03');assert.equal(x.upcoming,1);assert.equal(x.score,null);
+const entries=[{...p('a',300,'2026-10-02'),solde_anterieur:500,detail_echeance:{total:1350}},{...p('c',550,'2026-10-02'),solde_anterieur:500,detail_echeance:{total:1350}}];
+let r=paymentSchedule(lease,[],entries,'2026-10','2026-10',[{locataire_id:'a',mois:'2026-10',total:1350,solde:500}]);assert.equal(r.due,1350);assert.equal(r.priorBalance,500);assert.equal(r.unpaid,500);assert.equal(r.received,850);
+r=paymentSchedule(lease,[],entries,'2026-10','2026-10',[{locataire_id:'a',mois:'2026-10',total:1450,solde:600}]);assert.equal(r.due,null);
+const React=require('react'),{renderToStaticMarkup}=require('react-dom/server'),Card=loadSource('src/app/dashboard/locataires/TenantPaymentReview.tsx').default;
+const html=renderToStaticMarkup(React.createElement(Card,{review:x,notes:[{name:'Locataire',text:'<script>privé</script>'}]}));assert(html.includes('Suivi des paiements'));assert(html.includes('&lt;script&gt;privé&lt;/script&gt;'));assert(html.includes('Commentaire interne'));assert(!html.includes('<script>'));
+console.log('Suivi : dates limites, couple, paiements fractionnés, retards, données incomplètes, commentaire privé échappé et solde antérieur unique : OK');

@@ -6,9 +6,9 @@ import {rentalDate} from './rentalTotals'
 type Lease={id:string;actif?:boolean|null;date_entree?:string|null;date_sortie?:string|null;loyer_hc?:number|null;charges?:number|null;historique_loyers?:unknown}
 type Annex={id?:string;lot_id:string;date_debut:string;date_fin?:string|null;prix_mensuel:number}
 type Payment={montant?:number|null;statut?:string|null;detail_echeance?:{total?:number|null;caution_montant?:number|null;regularisation_charges?:number|null}|null;solde_anterieur?:number|null}
-type ScheduleResult={due:number|null;received:number|null;unpaid:number|null;reason:string|null;regularisation?:number|null}
+type ScheduleResult={due:number|null;received:number|null;unpaid:number|null;reason:string|null;priorBalance?:number|null;regularisation?:number|null}
 type ScheduleReceipt={locataire_id:string;mois:string;total?:number|null;solde?:number|null;regularisation_charges?:number|null;caution_affichee?:boolean|null;caution_total_inclus?:boolean|null;caution_montant?:number|null}
-/** Échéance du mois hors caution et dette antérieure ; ne modifie aucune donnée. */
+/** Échéance du mois hors caution, solde antérieur inclus ; ne modifie aucune donnée. */
 export function paymentSchedule(lease:Lease,annexes:Annex[],payments:Payment[],month:string,asOfMonth=rentalDate().slice(0,7),receipts:ScheduleReceipt[]=[]):ScheduleResult|null{
  const bounds=annexeMonthBounds(month);if(!bounds)throw new Error('Mois invalide')
  const entry=validCalendarDate(lease.date_entree)
@@ -22,7 +22,13 @@ export function paymentSchedule(lease:Lease,annexes:Annex[],payments:Payment[],m
  const paid=entryMoney(recorded.reduce((sum,p)=>sum+Number(p.montant??0),0))
  // A regularisation belongs to the monthly obligation, not to each instalment.
  const documents:Payment[]=receipts.map(q=>({solde_anterieur:q.solde??0,detail_echeance:{total:q.total,caution_montant:q.caution_total_inclus&&q.caution_affichee?q.caution_montant:0,regularisation_charges:q.regularisation_charges??0}}))
- const sources=[...payments,...documents],regularisations=sources.map(p=>Number(p.detail_echeance?.regularisation_charges??0))
+ const sources=[...payments,...documents]
+ const balances=sources.map(p=>Number(p.solde_anterieur??0))
+ if(balances.some(v=>!Number.isFinite(v)||v<0))return {due:null,received:paid,unpaid:null,reason:'Solde antérieur invalide : vérifiez la saisie.'}
+ const distinctBalances=[...new Set(balances.map(entryMoney).filter(v=>v!==0))]
+ if(distinctBalances.length>1)return {due:null,received:paid,unpaid:null,reason:'Plusieurs soldes antérieurs différents pour ce mois : vérifiez les saisies.'}
+ const priorBalance=distinctBalances[0]??0
+ const regularisations=sources.map(p=>Number(p.detail_echeance?.regularisation_charges??0))
  if(regularisations.some(v=>!Number.isFinite(v)))return {due:null,received:paid,unpaid:null,reason:'Régularisation de charges invalide : vérifiez la saisie.'}
  const nonzero=[...new Set(regularisations.map(entryMoney).filter(v=>v!==0))]
  if(nonzero.length>1)return {due:null,received:paid,unpaid:null,reason:'Plusieurs régularisations différentes pour ce mois : vérifiez les paiements et quittances.'}
@@ -31,11 +37,11 @@ export function paymentSchedule(lease:Lease,annexes:Annex[],payments:Payment[],m
  const distinct=[...new Set(snapshots)]
  if(distinct.length>1)return {due:null,received:paid,unpaid:null,regularisation,reason:'Les montants enregistrés pour ce mois sont différents : vérifiez les paiements.'}
  let due:number
- if(distinct.length)due=entryMoney(distinct[0]+regularisation)
+ if(distinct.length)due=entryMoney(distinct[0]+regularisation+priorBalance)
  else if(month<asOfMonth)return {due:null,received:paid,unpaid:null,reason:'Montant historique non enregistré : vérifiez le bail et les paiements.'}
- else {const rent=rentAt(lease,month),prorata=firstMonthProration(rent.loyer_hc,rent.charges,lease.date_entree,month),lots=prorateAnnexes(annexesForMonth(annexes,month),month,lease.date_entree);due=entryMoney(prorata.loyer+prorata.charges+lots.reduce((sum,a)=>sum+Number(a.prix_mensuel),0)+regularisation)}
+ else {const rent=rentAt(lease,month),prorata=firstMonthProration(rent.loyer_hc,rent.charges,lease.date_entree,month),lots=prorateAnnexes(annexesForMonth(annexes,month),month,lease.date_entree);due=entryMoney(prorata.loyer+prorata.charges+lots.reduce((sum,a)=>sum+Number(a.prix_mensuel),0)+regularisation+priorBalance)}
  if(!Number.isFinite(due)||due<0)return {due:null,received:paid,unpaid:null,reason:'Montant d’échéance invalide : vérifiez le bail et les paiements.'}
- return {due,regularisation,received:paid,unpaid:Math.max(0,entryMoney(due-paid)),reason:null}
+ return {due,priorBalance,regularisation,received:paid,unpaid:Math.max(0,entryMoney(due-paid)),reason:null}
 }
 
 type ScheduleTenant={id:string;nom?:string|null;civilite?:string|null;nom_famille?:string|null;prenom?:string|null;bail_id?:string|null;bien_id?:string|null;est_principal?:boolean|null;actif?:boolean|null;date_entree?:string|null;date_sortie?:string|null;loyer_hc?:number|null;charges?:number|null;historique_loyers?:unknown}

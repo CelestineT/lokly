@@ -2,7 +2,7 @@ const assert=require('assert'),{loadSource}=require('./source-loader.cjs'),{paym
 const lease={id:'b',bien_id:'B',date_entree:'2026-10-16',loyer_hc:620,charges:62},box={bail_id:'b',lot_id:'box',date_debut:'2026-10-16',prix_mensuel:62}
 let r=paymentSchedule(lease,[box],[],'2026-10','2026-10');assert.equal(r.due,384);assert.equal(r.unpaid,384)
 r=paymentSchedule(lease,[box],[{statut:'partiel',montant:200}],'2026-10','2026-10');assert.equal(r.unpaid,184)
-r=paymentSchedule(lease,[],[{statut:'recu',montant:300,solde_anterieur:100,detail_echeance:{total:550,caution_montant:50}}],'2026-10','2026-10');assert.equal(r.due,400);assert.equal(r.unpaid,100)
+r=paymentSchedule(lease,[],[{statut:'recu',montant:300,solde_anterieur:100,detail_echeance:{total:550,caution_montant:50}}],'2026-10','2026-10');assert.equal(r.due,500);assert.equal(r.unpaid,200)
 r=paymentSchedule(lease,[],[{statut:'partiel',montant:100,detail_echeance:{total:200}},{statut:'partiel',montant:100,detail_echeance:{total:300}}],'2026-10','2026-10');assert.equal(r.due,null);assert.equal(r.unpaid,null)
 r=paymentSchedule(lease,[],[],'2026-10','2026-11');assert.equal(r.due,null,'Un ancien mois sans montant enregistré ne doit pas être supposé')
 assert.equal(paymentSchedule({...lease,date_sortie:'2026-10-31'},[],[],'2026-11','2026-11'),null)

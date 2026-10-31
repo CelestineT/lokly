@@ -1,4 +1,6 @@
 import './locataires.css'
+import TenantPaymentReview from './TenantPaymentReview'
+import {tenantPaymentReview} from '@/lib/tenantPaymentReview'
 import {House,CalendarDays} from 'lucide-react'
 import {leaseAmounts,rentalDate,rentalPrincipal} from '@/lib/rentalTotals'
 import {readAllRows} from '@/lib/readAllRows'
@@ -10,9 +12,9 @@ import Link from 'next/link'
 import DeleteLocataireButton from './DeleteLocataireButton'
 import { formatLocataireName } from '@/lib/locataireName'
 
-type Locataire = { id:string; bien_id:string; bail_id:string|null; est_principal:boolean|null; civilite:string|null; nom_famille:string|null; prenom:string|null; nom:string; email:string; date_entree:string; date_sortie:string|null; loyer_hc:number; charges:number; caution_payee:boolean; actif:boolean; created_at:string }
+type Locataire = { id:string; bien_id:string; bail_id:string|null; est_principal:boolean|null; civilite:string|null; nom_famille:string|null; prenom:string|null; nom:string; email:string; date_entree:string; date_sortie:string|null; loyer_hc:number; charges:number; caution_payee:boolean; actif:boolean; created_at:string; qualite_interne?:string|null; mode_paiement?:string|null }
 type Bien = { id:string; nom:string; nom_personnalise?:string|null; adresse:string; ville:string; type:string|null; annexes:string[]|null }
-type Bail = { id:string; bien_id:string; lot_id:string|null; type_occupation:string; date_entree:string; date_sortie:string|null; loyer_hc:number; charges:number; caution_payee:boolean; actif:boolean; created_at:string }
+type Bail = { id:string; bien_id:string; lot_id:string|null; type_occupation:string; date_entree:string; date_sortie:string|null; loyer_hc:number; charges:number; caution_payee:boolean; actif:boolean; created_at:string; qualite_interne?:string|null; mode_paiement?:string|null }
 type Lot = { id:string; bien_id:string; numero_lot:string|null; nom_personnalise:string|null; type:string|null; specificite:string|null; annexes:string[]|null }
 type Affectation = { bail_id:string; lot_id:string; date_fin:string|null; date_debut:string; prix_mensuel:number }
 type GroupeOccupation = { key:string; bail:Bail|null; occupants:Locataire[] }
@@ -22,12 +24,14 @@ const lotLabel=(lot:Lot|undefined)=>{if(!lot)return null;const type=formatLotTyp
 export default async function LocatairesPage() {
   const supabase = await createClient()
   const orders=await getCardOrders()
-  const [{ data: locatairesData },{ data: biensData },{ data: bauxData },{ data: lotsData },{ data: affectationsData }] = await Promise.all([
+  const [{ data: locatairesData },{ data: biensData },{ data: bauxData },{ data: lotsData },{ data: affectationsData }, paymentData, receiptData] = await Promise.all([
     readAllRows(supabase.from('locataires').select('*').order('created_at', { ascending: false })),
     supabase.from('biens').select('*'),
     readAllRows(supabase.from('baux').select('*')),
     supabase.from('lots').select('id, bien_id, numero_lot, nom_personnalise, type, specificite, annexes'),
-    readAllRows(supabase.from('affectations_lots_baux').select('id, bail_id, lot_id, date_debut, date_fin, prix_mensuel'))
+    readAllRows(supabase.from('affectations_lots_baux').select('id, bail_id, lot_id, date_debut, date_fin, prix_mensuel')),
+    readAllRows(supabase.from('paiements').select('*')).catch(()=>({data:[],error:true})),
+    readAllRows(supabase.from('quittances').select('*')).catch(()=>({data:[],error:true}))
   ])
 
   const locataires: Locataire[] = locatairesData ?? []
@@ -92,7 +96,7 @@ export default async function LocatairesPage() {
           {annexes.map(annexe => <div key={annexe.lot_id} className="flex justify-between gap-3"><span>{annexe.lot?.nom_personnalise?.trim() || lotLabel(annexe.lot) || 'Lot annexe'}</span><span className="shrink-0">{annexe.prix_mensuel.toLocaleString('fr-FR')} € / mois</span></div>)}
         </div>
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between text-sm mt-3 pt-3 border-t border-slate-50 pointer-events-none"><div><span className="font-semibold text-slate-900">{total.toLocaleString('fr-FR')} € / mois</span><span className="block text-[11px] leading-4 text-slate-400 font-normal">{termine?'Dernier total mensuel':'Total mensuel'}{annexes.length > 0 ? ' · charges et annexes comprises' : ' · charges comprises'}</span>{estGroupe && typeOccupation === 'bail_commun' && <span className="block text-[11px] leading-4 text-slate-400 font-normal">Loyer du bail — compté une seule fois</span>}</div>{termine?<div className="grid grid-cols-2 gap-x-5 text-xs leading-4 text-slate-400 sm:text-right sm:shrink-0"><span><span className="block text-[10px] uppercase tracking-wide">Entrée</span>{dateEntree}</span><span><span className="block text-[10px] uppercase tracking-wide">Sortie</span>{dateSortie??'À renseigner'}</span></div>:<span className="text-xs leading-4 text-slate-400 sm:text-right sm:shrink-0"><CalendarDays size={14} className="inline-block mr-1"/> Entrée le {dateEntree}</span>}</div>
-        <div className="relative z-10 mt-3 flex justify-end gap-2"><Link href={ficheHref} className="inline-flex items-center border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Consulter</Link><Link href={modifierHref} className="inline-flex items-center border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Modifier</Link><DeleteLocataireButton id={principal.id} nom={estGroupe ? titre : principal.nom} /></div>
+        <div className="relative z-10 mt-3 flex flex-wrap items-start gap-2"><Link href={ficheHref} className="inline-flex items-center border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Consulter</Link><Link href={modifierHref} className="inline-flex items-center border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium hover:bg-slate-50">Modifier</Link><DeleteLocataireButton id={principal.id} nom={estGroupe ? titre : principal.nom} /><TenantPaymentReview error={!!paymentData.error||!!receiptData.error} review={tenantPaymentReview(bail,groupe.occupants,affectations,paymentData.data??[],receiptData.data??[])} notes={groupe.occupants.filter(o=>o.qualite_interne?.trim()).map(o=>({name:formatLocataireName(o),text:o.qualite_interne!}))}/></div>
       </div>
     )
   }
