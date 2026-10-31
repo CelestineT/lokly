@@ -9,7 +9,7 @@ r=calc({from:'2026-10-24',to:'2026-10-27',today:'2026-10-30',baux:[lease('dst','
 r=calc({from:'2024-02-28',to:'2024-03-01',biens:[{...B,date_mise_location:'2024-02-28'}]});assert.equal(r.availableDays,3);
 // One dwelling available for 100 days and occupied; one for 10 days and empty: 10/110, not (0%+100%)/2.
 r=calc({from:'2026-01-01',to:'2026-04-10',biens:[{...B,date_mise_location:'2026-01-01'}],lots:[unit('long'),{...unit('short'),date_mise_location:'2026-04-01'},{...unit('box'),type:'box'}],baux:[lease('long','long','2026-01-01')],locataires:[tenant('long','long')]});assert.equal(r.availableDays,110);assert.equal(r.emptyDays,10);assert(Math.abs(r.rate-1000/110)<1e-10);assert.equal(r.units.length,2,'Les boxes sont exclus');
-r=calc({biens:[{...B,date_mise_location:null,date_acquisition:'2020-01-01'}]});assert.equal(r.rate,null,'Aucune disponibilité inventée à l’acquisition');assert(r.issues.length);
+r=calc({biens:[{...B,date_mise_location:null,date_acquisition:'2020-01-01'}]});assert.equal(r.rate,100,'Sans mise en location, les jours sans bail sont vacants depuis l’acquisition');assert(r.units[0].assumption);
 r=calc({baux:[lease('unknown',null,'2026-03-01')],locataires:[tenant('unknown','unknown')]});assert.equal(r.rate,null,'Bail non rattaché : ne pas annoncer 100% de vacance');
 r=calc({baux:[lease('deleted','u','2026-03-01')],locataires:[]});assert.equal(r.rate,null,'Historique supprimé : signaler l’impossibilité de reconstituer les jours');
 r=calc({baux:[{...lease('noend','u','2026-03-01'),actif:false}],locataires:[tenant('noend','noend')]});assert.equal(r.rate,null);

@@ -1,12 +1,12 @@
 import {rentalDate} from './rentalTotals'
-type Property={id:string;nom?:string;type:string;date_mise_location?:string|null}
+type Property={id:string;nom?:string;type:string;date_acquisition?:string|null;date_mise_location?:string|null}
 type Unit={id:string;bien_id:string;type:string;nom_personnalise?:string|null;numero_lot?:string|null;date_mise_location?:string|null}
 type Lease={id:string;bien_id?:string|null;lot_id?:string|null;date_entree?:string|null;date_sortie?:string|null;actif?:boolean|null;legacyTenantId?:string}
 type Tenant=Lease&{bail_id?:string|null}
 const HOMES=new Set(['appartement','studio','maison']),DAY=86400000
 export function calendarDay(value:string|null|undefined):number|null{if(!value||!/^\d{4}-\d{2}-\d{2}$/.test(value))return null;const d=new Date(`${value}T00:00:00Z`);return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===value?d.getTime()/DAY:null}
 export type VacancyLease={id:string;locataireId:string|null;legacy:boolean;date_entree:string|null;date_sortie:string|null;actif:boolean|null;issue:string|null}
-export type VacancyUnit={id:string|null;bien_id:string;label:string;availableDays:number;emptyDays:number;issue:string|null;leases:VacancyLease[];availableFrom:string|null}
+export type VacancyUnit={id:string|null;bien_id:string;label:string;availableDays:number;emptyDays:number;issue:string|null;leases:VacancyLease[];availableFrom:string|null;assumption?:string|null}
 /** Calendar days, entry and departure included. Aggregate day counts, never average percentages. */
 export function rentalVacancy({biens,lots,baux,locataires,from,to,lotId,today=rentalDate()}:{biens:Property[];lots:Unit[];baux:Lease[];locataires:Tenant[];from:string;to:string;lotId?:string;today?:string}){
  const endDate=to<today?to:today,start=calendarDay(from),end=calendarDay(endDate),units:VacancyUnit[]=[]
@@ -25,8 +25,9 @@ export function rentalVacancy({biens,lots,baux,locataires,from,to,lotId,today=re
   const homes=[...new Map(lots.filter(l=>l.bien_id===bien.id&&HOMES.has(l.type)).map(l=>[l.id,l])).values()]
   const selected=lotId?homes.filter(l=>l.id===lotId):homes
   const candidates:(Unit|null)[]=selected.length?selected:!lotId&&HOMES.has(bien.type)&&homes.length===0?[null]:[]
-  for(const unit of candidates){const label=unit?.nom_personnalise||unit?.numero_lot||bien.nom||'Logement',row:VacancyUnit={id:unit?.id??null,bien_id:bien.id,label,availableDays:0,emptyDays:0,issue:null,leases:[],availableFrom:unit?.date_mise_location??bien.date_mise_location??null},availability=calendarDay(unit?.date_mise_location??bien.date_mise_location);units.push(row)
-   if(availability===null){row.issue='Date de mise en location manquante ou invalide.';continue}
+  for(const unit of candidates){const label=unit?.nom_personnalise||unit?.numero_lot||bien.nom||'Logement',row:VacancyUnit={id:unit?.id??null,bien_id:bien.id,label,availableDays:0,emptyDays:0,issue:null,leases:[],availableFrom:unit?.date_mise_location??bien.date_mise_location??null},rawAvailability=unit?.date_mise_location??bien.date_mise_location,availability=rawAvailability?calendarDay(rawAvailability):calendarDay(bien.date_acquisition)??start;units.push(row)
+   if(availability===null){row.issue='Date de mise en location invalide.';continue}
+   if(!rawAvailability)row.assumption=`Mise en location non renseignée : jours sans bail comptés vacants depuis ${calendarDay(bien.date_acquisition)!==null?'l’acquisition':'le début de la période'}.`
    const begin=Math.max(start,availability);if(begin>end)continue
    const relevant=leases.filter(b=>b.bien_id===bien.id&&(unit?b.lot_id===unit.id||homes.length===1&&HOMES.has(bien.type)&&!b.lot_id:!b.lot_id)&&overlaps(b,begin))
    const describe=(b:Lease):VacancyLease=>{const s=calendarDay(b.date_entree),e=b.date_sortie?calendarDay(b.date_sortie):null;const issue=!b.date_entree?'Date d’entrée du bail manquante.':s===null?'Date d’entrée du bail invalide.':b.date_sortie&&e===null?'Date de sortie du bail invalide.':e!==null&&e<s?'La date de sortie du bail précède sa date d’entrée.':b.actif===false&&!b.date_sortie?'Bail marqué terminé sans date de sortie. Renseignez sa fin ou corrigez son statut s’il est toujours en cours.':!members.has(b.id)?'Un bail subsiste sans fiche locataire rattachée.':null;return{id:b.id,locataireId:b.legacyTenantId??locataires.find(t=>t.bail_id===b.id)?.id??null,legacy:!!b.legacyTenantId,date_entree:b.date_entree??null,date_sortie:b.date_sortie??null,actif:b.actif??null,issue}}

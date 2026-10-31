@@ -70,7 +70,7 @@ export default function DashboardPage(){
  <K l={lotMode?"Encaissements des baux liés":"Recettes encaissées"} v={loading?'…':euro(calc.recettes)} href="/dashboard/paiements" sub="Sur la période sélectionnée"/>
  <K l="Dépenses" v={loading?'…':lotMode?'—':euro(calc.depenses)} href="/dashboard/depenses" sub={lotMode?'Non ventilées par lot':'Sur la période sélectionnée'}/>
  <K l="Cash-flow après dette" v={loading?'…':lotMode?'—':euro(calc.cash)} href="/dashboard/rentabilite" sub={lotMode?'Non ventilé par lot':'Après crédit et assurance'} tone={calc.cash<0?'negative':'positive'}/>
- <K l="Taux de vacance" v={loading?'…':calc.vacance===null?'—':`${calc.vacance.toFixed(1)} %`} href="#vacancy-diagnostics" sub={vacancyInfo.issues.length?'Données de bail à vérifier':'Sur les logements disponibles'} help="Part des jours où les logements disponibles sont restés sans bail pendant la période sélectionnée."/>
+ <K l="Taux de vacance" v={loading?'…':calc.vacance===null?'—':`${calc.vacance.toFixed(1)} %`} href="#vacancy-diagnostics" sub={vacancyInfo.issues.length?'Données de bail à vérifier':'Jours sans bail sur la période'} help="Part des jours sans bail. Sans date de mise en location, calcul depuis l’acquisition ou le début de période ; les jours occupés restent déduits."/>
 
  </div>
  <div className="dashboard-secondary">
@@ -100,7 +100,7 @@ const dashboardTips:Record<string,string>={
  'Recettes encaissées':'Somme des paiements réellement reçus sur la période sélectionnée. Les paiements en statut reçu ou partiel sont comptabilisés.',
  'Dépenses':'Total de toutes les dépenses enregistrées sur la période sélectionnée, quelle que soit leur catégorie.',
  'Charges':'Dépenses courantes : charges et frais de copropriété, assurances, gestion, taxes, dépenses personnalisées « Autre » et entretien ou réparation.',
- 'Taux de vacance':'Part des jours où les logements disponibles à la location sont restés sans bail pendant la période sélectionnée.',
+ 'Taux de vacance':'Part des jours sans bail. Sans date de mise en location, calcul depuis l’acquisition ou le début de période ; les jours occupés restent déduits.',
  'Rentabilité brute annualisée':'Total des loyers mensuels hors charges actuels × 12 ÷ coût d’acquisition (prix et frais, hors éléments financés complémentaires) × 100.',
  'TRI du bien':'Taux de rendement interne calculé avec les flux datés et la valeur actuelle du bien sélectionné. Il est indépendant de la période des encaissements affichés.',
  'Encaissements des baux liés':'Paiements reçus sur les baux liés au lot, charges et autres annexes comprises. Ils ne sont pas ventilés par lot.',
