@@ -1,6 +1,7 @@
 'use client'
 import {Wallet,Receipt,ChartNoAxesCombined,House,Building2,Euro,Percent,TrendingUp,ChartPie,PiggyBank,FileText,TriangleAlert,ChevronRight,CalendarDays,Plus} from 'lucide-react'
 import {periodCashFlow} from '@/lib/periodCashFlow'
+import {expenseCategoryLabel,expenseCategoryKey} from '@/lib/expenseCategories'
 import {rentalVacancy} from '@/lib/rentalVacancy'
 import {netPropertyValue} from '@/lib/netPropertyValue'
 import {rentalDate} from '@/lib/rentalTotals'
@@ -29,9 +30,9 @@ type Financement=LoanDeferral & {bien_id:string;montant_emprunte:number|null;tau
 type Locataire={id:string;nom:string;bail_id:string|null;bien_id:string|null;loyer_hc?:number;charges?:number;actif?:boolean;date_entree?:string|null;date_sortie?:string|null;est_principal?:boolean|null}
 type Monthly={label:string;recettes:number;depenses:number;cash:number;charges:number}
 const HAB_BIEN=new Set(['appartement','maison','studio']),HAB_LOT=new Set(['appartement','studio','maison']),HORS=new Set(['parking','box','garage','cave','local_commercial','local-commercial','local commercial']),DAY=86400000
-const OPERATING_CHARGE_CATEGORIES=new Set(['charges','assurance','gestion','taxe'])
+const OPERATING_CHARGE_CATEGORIES=new Set(['charges','frais_copropriete','charge_copropriete','assurance','gestion','taxe','autre'])
 const n=(v:number|null|undefined)=>Number(v??0),euro=(v:number)=>new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:0,maximumFractionDigits:2}).format(v),iso=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`,ds=(s:string)=>new Date(`${s}T00:00:00`),days=(a:Date,b:Date)=>Math.max(0,Math.floor((b.getTime()-a.getTime())/DAY)+1)
-function isOperatingCharge(d:Depense){return OPERATING_CHARGE_CATEGORIES.has(d.categorie)||(d.categorie==='travaux'&&d.type_travaux==='Entretien / réparation')}
+function isOperatingCharge(d:Depense){return OPERATING_CHARGE_CATEGORIES.has(expenseCategoryKey(d.categorie))||(d.categorie==='travaux'&&d.type_travaux==='Entretien / réparation')}
 function fmtMonth(m:string){const[y,mo]=m.split('-');return new Date(+y,+mo-1,1).toLocaleDateString('fr-FR',{month:'short',year:'2-digit'}).replace(/^./,c=>c.toUpperCase())}
 function shiftDays(d:Date,count:number){return new Date(d.getTime()+count*DAY)}
 export default function DashboardPage(){
@@ -82,6 +83,7 @@ export default function DashboardPage(){
  <div className="dashboard-charts"><RentProgression title="Progression des loyers" baux={baux} locataires={locs} affectations={affectations} from={from} to={to} bienId={bienId||undefined} lotId={lotId||undefined} loading={loading}/>
  <Chart title={lotMode?"Encaissements des baux liés":"Encaissements et dépenses"} data={calc.monthly} keys={lotMode?['recettes']:['recettes','depenses']}/>{!lotMode&&<Chart title="Cash-flow mensuel" data={calc.monthly} keys={['cash']}/>}
  {!lotMode&&<Chart title="Évolution des charges" data={calc.monthly} keys={['charges']}/>}</div>
+ {!lotMode&&!loading&&valid&&<section className="dashboard-history"><header><h2>Dépenses par catégorie</h2><Link href="/dashboard/depenses">Voir les dépenses <ChevronRight size={14}/></Link></header><div className="p-4 space-y-2">{Object.entries(scope.depenses.filter(d=>d.date_depense>=from&&d.date_depense<=to).reduce((acc:Record<string,number>,d)=>{const label=expenseCategoryLabel(d.categorie);acc[label]=(acc[label]??0)+n(d.montant);return acc},{})).map(([label,total])=><div key={label} className="flex justify-between gap-4 text-sm"><span>{label}</span><strong>{euro(total)}</strong></div>)}{!scope.depenses.some(d=>d.date_depense>=from&&d.date_depense<=to)&&<p>Aucune dépense sur cette période.</p>}</div></section>}
  <section className="dashboard-history" aria-labelledby="dashboard-history-title"><header><h2 id="dashboard-history-title">Historique des quittances</h2><Link href="/dashboard/quittances">Voir toutes les quittances <ChevronRight size={14}/></Link></header>
  {loading?<p className="dashboard-empty" role="status">Chargement…</p>:recent.length===0?<p className="dashboard-empty">Aucune quittance dans ce périmètre.</p>:<div className="dashboard-table-scroll"><table><thead><tr><th scope="col">Période</th><th scope="col">Libellé</th><th scope="col">Montant</th><th scope="col">Statut</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead><tbody>{recent.map(q=><tr key={q.id}><td>{fmtMonth(q.mois)}</td><td><Link href={`/dashboard/quittances/${q.id}`}>Quittance {fmtMonth(q.mois)}<span className="dashboard-tenant">{locMap.get(q.locataire_id)??'—'}</span></Link></td><td>{euro(q.total)}</td><td><span className={`dashboard-badge ${q.envoyee?'is-sent':'is-pending'}`}>{q.envoyee?'✓ Envoyée':'◷ À envoyer'}</span></td><td><Link href={`/dashboard/quittances/${q.id}`} aria-label={`Consulter la quittance de ${locMap.get(q.locataire_id)??'ce locataire'} pour ${fmtMonth(q.mois)}`}><ChevronRight size={16}/></Link></td></tr>)}</tbody></table></div>}</section>
  <div className="dashboard-details"><h2>Détails des indicateurs</h2>{!loading&&<RentalBreakdown totals={totals}/>} {!loading&&valid&&<div className="dashboard-diagnostics"><VacancyDiagnostics result={vacancyInfo}/>{!lotMode&&<details className="rounded-xl border bg-white p-4 text-sm"><summary className="cursor-pointer font-medium">Vérifier le cash-flow</summary><div className="mt-3 space-y-2"><p>Encaissements sur la période : {euro(calc.recettes)}</p><p>Dépenses sur la période : − {euro(calc.depenses)}</p><p>Crédit et assurance estimés : − {euro(calc.debt)}</p><p className="font-semibold">Cash-flow : {euro(calc.cash)}</p><p className="text-xs text-slate-500">Les loyers sans paiement enregistré ne sont pas des encaissements. Les crédits sont estimés par mois d’après les mensualités et différés renseignés ; ces montants ne sont pas un relevé bancaire.</p></div></details>}</div>}
@@ -93,7 +95,7 @@ const dashboardTips:Record<string,string>={
  'Biens hors logements':'Nombre de biens ou lots qui ne sont pas des logements : box, parkings, garages, caves et locaux commerciaux.',
  'Recettes encaissées':'Somme des paiements réellement reçus sur la période sélectionnée. Les paiements en statut reçu ou partiel sont comptabilisés.',
  'Dépenses':'Total de toutes les dépenses enregistrées sur la période sélectionnée, quelle que soit leur catégorie.',
- 'Charges':'Dépenses courantes d’exploitation : charges, assurances, gestion, taxes et travaux d’entretien ou de réparation.',
+ 'Charges':'Dépenses courantes : charges et frais de copropriété, assurances, gestion, taxes, dépenses personnalisées « Autre » et entretien ou réparation.',
  'Taux de vacance':'Part des jours où les logements disponibles à la location sont restés sans bail pendant la période sélectionnée.',
  'Rentabilité brute annualisée':'Total des loyers mensuels hors charges actuels × 12 ÷ coût d’acquisition (prix et frais, hors éléments financés complémentaires) × 100.',
  'TRI du bien':'Taux de rendement interne calculé avec les flux datés et la valeur actuelle du bien sélectionné. Il est indépendant de la période des encaissements affichés.',
