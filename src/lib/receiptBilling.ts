@@ -37,3 +37,9 @@ export function receiptSurface(bien:{type?:string|null;surface_m2?:number|string
  if(value==null||String(value).trim()==='')return undefined
  const number=Number(value);return Number.isFinite(number)&&number>0?number:undefined
 }
+
+/** A document must never certify full payment when its displayed obligation remains unpaid. */
+export function rentalDocumentTitle(total:number,paid:number){
+ const due=Math.max(0,Math.round(total*100)),received=Math.max(0,Math.round(paid*100))
+ return received>=due?'Quittance de loyer':received>0?'Reçu de paiement partiel':'Avis d’échéance'
+}
