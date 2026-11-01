@@ -52,7 +52,7 @@ export default function LoginPage() {
             <span className="block whitespace-nowrap" style={{lineHeight:'1.08em'}}><span className="font-normal" style={{fontSize:'.7em'}}>de vos</span> investissements</span>
             <span className="block" style={{lineHeight:'1.08em'}}>immobiliers</span>
           </h1>
-          <p className="mt-6 text-base text-blue-50 sm:text-lg" style={{lineHeight:1.6}}>Retrouvez vos biens, vos locataires et votre suivi financier dans un même espace.</p>
+          <p className="mt-6 text-base text-blue-50 sm:text-lg" style={{lineHeight:1.6}}>Retrouvez vos biens, vos locataires et votre suivi financier<br/>dans un même espace.</p>
         </div>
         <div className="flex flex-wrap items-center gap-x-8 gap-y-4 border-t border-white/20 pt-7 text-sm sm:text-base" aria-label="Biens, loyers et documents réunis dans votre espace">
           <span className="inline-flex items-center gap-2"><House size={17} aria-hidden="true"/>Biens</span>
