@@ -5,7 +5,7 @@ import type {QuittancePdfData} from './generateQuittancePdf'
 export class VerificationSetupError extends Error {}
 export const VERIFICATION_TOKEN=/^[a-f0-9]{64}$/
 export function verificationOrigin(){
- const raw=process.env.QUITTANCE_VERIFICATION_ORIGIN||'https://lokly-git-fix-v3-9-lot-principal-lockly1.vercel.app'
+ const raw=process.env.QUITTANCE_VERIFICATION_ORIGIN||'https://app.ekolocs.fr'
  const url=new URL(raw)
  if(url.protocol!=='https:'||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw new Error('Adresse de vérification invalide')
  return url.origin

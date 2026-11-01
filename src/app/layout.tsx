@@ -16,7 +16,10 @@ const poppins = Poppins({
 })
 
 export const metadata: Metadata = {
-  title: 'Lokly — Gestion locative simplifiée',
+  metadataBase: new URL('https://app.ekolocs.fr'),
+  applicationName: 'Ekolocs',
+  title: 'Ekolocs — Gestion autonome de vos investissements immobiliers',
+  icons: {icon: [{url: '/ekolocs-logo.jpeg?v=2', type: 'image/jpeg'}], apple: '/ekolocs-logo.jpeg'},
   description: 'Gérez vos biens, locataires, quittances et rentabilité en un seul endroit.',
 }
 
