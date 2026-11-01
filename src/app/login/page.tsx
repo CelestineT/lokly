@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { House, WalletCards, Files } from 'lucide-react'
 import { Cormorant_Garamond } from 'next/font/google'
 const autonomousFont=Cormorant_Garamond({subsets:['latin'],weight:'500',style:'italic',display:'swap'})
 import { createClient } from '@/lib/supabase/client'
@@ -43,13 +44,20 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen bg-[#f1f7fd] text-[#080d49] lg:grid lg:grid-cols-[minmax(380px,46%)_1fr]">
-      <section className="relative overflow-hidden bg-[#08075a] px-6 pt-10 pb-16 text-white sm:px-12 lg:min-h-screen lg:flex lg:flex-col lg:justify-center lg:px-16 lg:py-16">
-        <div className="relative z-10 mx-auto max-w-xl text-left lg:mx-0 lg:text-left">
-          <a href="https://ekolocs.fr" target="_blank" rel="noopener noreferrer" title="Ouvrir le site vitrine — nouvel onglet" aria-label="Ekolocs — site vitrine, nouvel onglet" className="inline-block"><img src="/ekolocs-logo.jpeg" alt="Ekolocs, l’immobilier privé" style={{borderRadius:"3.5% / 12%"}} className="h-auto w-full max-w-[465px] lg:max-w-full" /></a>
-          <h1 className="mt-9 text-3xl font-bold leading-tight sm:text-4xl lg:mt-14 lg:text-[clamp(2rem,3.3vw,4rem)]">Gestion <span className={autonomousFont.className} style={{color:'#00c77b',fontSize:'1.15em',fontWeight:500}}>autonome</span><br/><span className="text-[.7em] font-normal">de vos</span> investissements<br className="hidden lg:block"/> immobiliers</h1>
-          
+      <section className="relative flex flex-col justify-between gap-16 overflow-hidden bg-[#08075a] px-6 pb-16 pt-10 text-white sm:px-12 lg:min-h-screen lg:px-16 lg:py-12">
+        <div className="relative z-10 w-full text-left" style={{containerType:'inline-size'}}>
+          <a href="https://ekolocs.fr" target="_blank" rel="noopener noreferrer" title="Ouvrir le site vitrine — nouvel onglet" aria-label="Ekolocs — site vitrine, nouvel onglet" className="inline-block" style={{width:'40%',minWidth:150,maxWidth:280}}><img src="/ekolocs-logo.jpeg" alt="Ekolocs, l’immobilier privé" style={{borderRadius:'3.5% / 12%'}} className="h-auto w-full" /></a>
+          <h1 className="mt-14 font-bold" style={{fontSize:'clamp(18px, 7.4cqw, 52px)',lineHeight:1.3}}>
+            <span className="block whitespace-nowrap" style={{lineHeight:'1.3em'}}>Gestion <span className={autonomousFont.className} style={{color:'#00c77b',fontSize:'1.15em',fontWeight:500,lineHeight:1}}>autonome</span></span>
+            <span className="block whitespace-nowrap" style={{lineHeight:'1.3em'}}><span className="font-normal" style={{fontSize:'.7em'}}>de vos</span> investissements</span>
+            <span className="block" style={{lineHeight:'1.3em'}}>immobiliers</span>
+          </h1>
         </div>
-
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-4 border-t border-white/20 pt-7 text-sm sm:text-base" aria-label="Biens, loyers et documents réunis dans votre espace">
+          <span className="inline-flex items-center gap-2"><House size={17} aria-hidden="true"/>Biens</span>
+          <span className="inline-flex items-center gap-2"><WalletCards size={17} aria-hidden="true"/>Loyers</span>
+          <span className="inline-flex items-center gap-2"><Files size={17} aria-hidden="true"/>Documents</span>
+        </div>
       </section>
       <section className="relative -mt-8 px-4 pb-12 lg:mt-0 lg:flex lg:min-h-screen lg:flex-col lg:justify-center lg:px-12">
         <div className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_12px_35px_rgba(25,53,105,0.08)] sm:p-9">
