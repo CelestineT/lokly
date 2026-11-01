@@ -37,6 +37,7 @@ async function renderQuittancePdf(p:QuittancePdfData,compact:boolean):Promise<Ui
  function ensure(h:number){if(y-h<60)newPage()}
  function card(x:number,w:number,title:string,content:string[],top:number,h:number,fill=white){round(x,top,w,h,9,fill);text(title,x+12,top-18,7.5,bold);let cy=top-(compact?33:37);for(const value of content){for(const line of lines(value,8.5,w-24)){text(line,x+12,cy,8.5);cy-=13}}}
  newPage()
+ if(remainingCents>0&&paidCents>0){text('Reçu de paiement partiel — ne vaut pas quittance pour solde.',margin,height-102,7,bold)}
  const iw=(cw-gap)/2,parties=[[p.proprietaireNom||'-',p.proprietaireTelephone?`Tél. : ${p.proprietaireTelephone}`:'',p.proprietaireEmail?`Mail : ${p.proprietaireEmail}`:''].filter(Boolean),[p.locataireNom||'-',p.locataireTelephone?`Tél. : ${p.locataireTelephone}`:'',p.locataireEmail?`Mail : ${p.locataireEmail}`:''].filter(Boolean)],ih=Math.max(compact?68:78,...parties.map(c=>(compact?34:38)+c.reduce((s,v)=>s+lines(v,8.5,iw-24).length*13,0)))
  ensure(ih);card(margin,iw,'COORDONNÉES BAILLEUR',parties[0],y,ih,soft);card(margin+iw+gap,iw,'INFORMATIONS LOCATAIRE',parties[1],y,ih,soft);y-=ih+sectionGap
  const pw=(cw-gap*2)/3,blocks=[{t:'IMMEUBLE',l:[p.bienNom||'-']},{t:'ADRESSE DE LA LOCATION',l:[p.bienAdresse||'-',p.bienVille||'']},{t:'LOGEMENT OCCUPÉ',l:[p.typeLogement||'À renseigner',p.specificiteLogement||'',p.surface?`${p.surface} m²`:'']}],ph=Math.max(compact?68:78,...blocks.map(b=>(compact?34:38)+b.l.filter(Boolean).reduce((sum,v)=>sum+lines(v,8.5,pw-24).length*13,0)))
