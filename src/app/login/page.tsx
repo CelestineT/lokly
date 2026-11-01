@@ -47,11 +47,12 @@ export default function LoginPage() {
       <section className="relative flex flex-col justify-between gap-16 overflow-hidden bg-[#08075a] px-6 pb-16 pt-10 text-white sm:px-12 lg:min-h-screen lg:px-16 lg:py-12">
         <div className="relative z-10 w-full text-left" style={{containerType:'inline-size'}}>
           <a href="https://ekolocs.fr" target="_blank" rel="noopener noreferrer" title="Ouvrir le site vitrine — nouvel onglet" aria-label="Ekolocs — site vitrine, nouvel onglet" className="inline-block" style={{width:'40%',minWidth:150,maxWidth:280}}><img src="/ekolocs-logo.jpeg" alt="Ekolocs, l’immobilier privé" style={{borderRadius:'3.5% / 12%'}} className="h-auto w-full" /></a>
-          <h1 className="mt-14 font-bold" style={{fontSize:'clamp(18px, 7.4cqw, 52px)',lineHeight:1.3}}>
-            <span className="block whitespace-nowrap" style={{lineHeight:'1.3em'}}>Gestion <span className={autonomousFont.className} style={{color:'#00c77b',fontSize:'1.15em',fontWeight:500,lineHeight:1}}>autonome</span></span>
-            <span className="block whitespace-nowrap" style={{lineHeight:'1.3em'}}><span className="font-normal" style={{fontSize:'.7em'}}>de vos</span> investissements</span>
-            <span className="block" style={{lineHeight:'1.3em'}}>immobiliers</span>
+          <h1 className="mt-12 font-bold" style={{fontSize:'clamp(18px, 7.4cqw, 52px)',lineHeight:1.08}}>
+            <span className="block whitespace-nowrap" style={{lineHeight:'1.08em'}}>Gestion <span className={autonomousFont.className} style={{color:'#00c77b',fontSize:'1em',fontWeight:500,lineHeight:1}}>autonome</span></span>
+            <span className="block whitespace-nowrap" style={{lineHeight:'1.08em'}}><span className="font-normal" style={{fontSize:'.7em'}}>de vos</span> investissements</span>
+            <span className="block" style={{lineHeight:'1.08em'}}>immobiliers</span>
           </h1>
+          <p className="mt-6 text-base text-blue-50 sm:text-lg" style={{lineHeight:1.6}}>Retrouvez vos biens, vos locataires et votre suivi financier dans un même espace.</p>
         </div>
         <div className="flex flex-wrap items-center gap-x-8 gap-y-4 border-t border-white/20 pt-7 text-sm sm:text-base" aria-label="Biens, loyers et documents réunis dans votre espace">
           <span className="inline-flex items-center gap-2"><House size={17} aria-hidden="true"/>Biens</span>
