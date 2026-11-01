@@ -48,7 +48,7 @@ export default function LoginPage() {
         <div className="relative z-10 w-full text-left" style={{containerType:'inline-size'}}>
           <a href="https://ekolocs.fr" target="_blank" rel="noopener noreferrer" title="Ouvrir le site vitrine — nouvel onglet" aria-label="Ekolocs — site vitrine, nouvel onglet" className="inline-block" style={{width:'40%',minWidth:150,maxWidth:280}}><img src="/ekolocs-logo.jpeg" alt="Ekolocs, l’immobilier privé" style={{borderRadius:'3.5% / 12%'}} className="h-auto w-full" /></a>
           <h1 className="mt-12 font-bold" style={{fontSize:'clamp(18px, 7.4cqw, 52px)',lineHeight:1.08}}>
-            <span className="block whitespace-nowrap" style={{lineHeight:'1.08em'}}>Gestion <span className={autonomousFont.className} style={{color:'#00c77b',fontSize:'1em',fontWeight:500,lineHeight:1}}>autonome</span></span>
+            <span className="block whitespace-nowrap" style={{lineHeight:'1.08em'}}>Gestion <span className={autonomousFont.className} style={{color:'#00c77b',fontSize:'1.32em',fontWeight:500,lineHeight:.8,display:'inline-block',verticalAlign:'baseline'}}>autonome</span></span>
             <span className="block whitespace-nowrap" style={{lineHeight:'1.08em'}}><span className="font-normal" style={{fontSize:'.7em'}}>de vos</span> investissements</span>
             <span className="block" style={{lineHeight:'1.08em'}}>immobiliers</span>
           </h1>
