@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Cormorant_Garamond } from 'next/font/google'
+const autonomousFont=Cormorant_Garamond({subsets:['latin'],weight:'500',style:'italic',display:'swap'})
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
-  const router = useRouter()
   const supabase = createClient()
 
   const [showPassword, setShowPassword] = useState(false)
@@ -22,13 +22,13 @@ export default function LoginPage() {
     setSuccess(null)
     setLoading(true)
 
+    try {
     if (mode === 'login') {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) {
         setError('Email ou mot de passe incorrect.')
       } else {
-        router.push('/dashboard')
-        router.refresh()
+        window.location.replace('/dashboard')
       }
     } else {
       const { error } = await supabase.auth.signUp({ email, password })
@@ -38,7 +38,7 @@ export default function LoginPage() {
         setSuccess('Vérifiez votre boîte mail pour confirmer votre compte.')
       }
     }
-    setLoading(false)
+    } catch {setError('Connexion momentanément indisponible. Veuillez réessayer.')} finally {setLoading(false)}
   }
 
   return (
@@ -46,7 +46,7 @@ export default function LoginPage() {
       <section className="relative overflow-hidden bg-[#08075a] px-6 pt-10 pb-16 text-white sm:px-12 lg:min-h-screen lg:flex lg:flex-col lg:justify-between lg:px-16 lg:py-16">
         <div className="relative z-10 mx-auto max-w-xl text-center lg:mx-0 lg:text-left">
           <a href="https://ekolocs.fr" target="_blank" rel="noopener noreferrer" title="Ouvrir le site vitrine — nouvel onglet" aria-label="Ekolocs — site vitrine, nouvel onglet" className="inline-block"><img src="/ekolocs-logo.jpeg" alt="Ekolocs, parc immobilier" className="mx-auto h-auto w-52 rounded-lg bg-white p-2 lg:mx-0 lg:w-64" /></a><a href="https://ekolocs.fr" target="_blank" rel="noopener noreferrer" title="Ouvrir le site Ekolocs dans un nouvel onglet" className="mt-3 hidden items-center gap-2 text-xs text-blue-100 underline lg:flex">Voir le site Ekolocs ↗</a>
-          <h1 className="mt-9 text-3xl font-bold leading-tight sm:text-4xl lg:mt-14 lg:text-5xl">Gestion autonome de vos investissements immobiliers</h1>
+          <h1 className="mt-9 text-3xl font-bold leading-tight sm:text-4xl lg:mt-14 lg:text-[clamp(2rem,3.3vw,4rem)]">Gestion <span className={autonomousFont.className} style={{color:'#00c77b',fontSize:'1.15em',fontWeight:500}}>autonome</span><br/><span className="text-[.7em] font-normal">de vos</span> investissements<br className="hidden lg:block"/> immobiliers</h1>
           <p className="mt-5 hidden max-w-lg text-lg text-blue-100 lg:block">Retrouvez vos biens, vos locataires et votre suivi financier dans un même espace.</p>
         </div>
         <div className="hidden border-t border-blue-300/40 pt-8 text-sm text-blue-100 lg:flex lg:gap-10"><span>⌂ &nbsp; Biens</span><span>▥ &nbsp; Loyers</span><span>▤ &nbsp; Documents</span></div>
