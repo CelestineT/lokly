@@ -1,5 +1,5 @@
 /** Preparation only: this module never contacts an SMS provider. */
-export const SMS_SENDER='BAILLEUR'
+export const SMS_SENDER='LE BAILLEUR'
 export const SMS_FIELDS={date_debut:'Date de début des travaux',date_fin:'Date de fin des travaux',mail_bailleur:'Mail du bailleur',telephone_bailleur:'Téléphone du bailleur',nouveau_loyer_hc:'Nouveau loyer hors charges',date_effet:'Date d’effet',nom_locataire:'Nom du locataire',prenom:'Prénom du locataire',bien:'Bien concerné'} as const
 export type SmsField=keyof typeof SMS_FIELDS
 export const SMS_TEMPLATES=[
