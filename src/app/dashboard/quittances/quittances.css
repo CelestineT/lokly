@@ -20,3 +20,5 @@
 .receipt-actions a,.receipt-badges a,.detail-edit,.detail-link,.detail-download{min-width:0;white-space:normal;overflow-wrap:anywhere}
 .detail-title-icon{flex-shrink:0}.detail-title>div:last-child{min-width:0}
 @media(max-width:420px){.receipts-filters{grid-template-columns:minmax(0,1fr)}.receipt-figures{flex-wrap:wrap;gap:10px}.receipt-figures>div{padding-right:9px}.receipt-actions a{flex:1 1 100%}.detail-title{align-items:flex-start}.detail-title h1{overflow-wrap:anywhere}}
+
+.receipt-badges .receipt-delivery-group{flex:0 1 auto}.receipt-badges{align-items:center}.receipt-badges .receipt-delivery{white-space:nowrap}
