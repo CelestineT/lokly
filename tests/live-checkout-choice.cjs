@@ -1,0 +1,21 @@
+const fs=require('node:fs'),assert=require('node:assert/strict'),ts=require('typescript'),Module=require('node:module');
+const m=new Module(__filename);m._compile(ts.transpileModule(fs.readFileSync('src/lib/checkoutChoice.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,__filename);
+const {prepareCheckoutChoice}=m.exports;
+const prev={session_id:'cs_old',plan:'essentiel',interval:'month'},annual={plan:'essentiel',interval:'year'};
+const base={id:'cs_old',livemode:true,client_reference_id:'user',status:'open',url:'https://checkout.stripe.com/old'};
+(async()=>{
+ let expired=0,claims=0;
+ const deps={read:async()=>({...base}),expire:async()=>{expired++;return {...base,status:'expired'}},claim:async()=>{claims++;return true}};
+ assert.deepEqual(await prepareCheckoutChoice(prev,prev,'user',deps),{state:'reuse',url:base.url});assert.equal(claims,0);
+ assert.deepEqual(await prepareCheckoutChoice(prev,annual,'user',deps),{state:'replace'});assert.equal(expired,1);
+ assert.equal((await prepareCheckoutChoice(prev,{plan:'patrimoine',interval:'month'},'user',deps)).state,'replace');
+ let reads=0;
+ assert.equal((await prepareCheckoutChoice(prev,annual,'user',{...deps,read:async()=>({...base,status:++reads===1?'open':'complete'}),expire:async()=>{throw Error('already paid')}})).state,'complete');
+ assert.equal((await prepareCheckoutChoice(prev,annual,'user',{...deps,read:async()=>({...base,status:'complete'})})).state,'complete');
+ await assert.rejects(()=>prepareCheckoutChoice(prev,annual,'user',{...deps,expire:async()=>{throw Error('network')}}),/network/);
+ let claimed=false;
+ const concurrent={...deps,claim:async()=>{if(claimed)return false;claimed=true;return true}};
+ assert.deepEqual((await Promise.all([prepareCheckoutChoice(prev,annual,'user',concurrent),prepareCheckoutChoice(prev,annual,'user',concurrent)])).map(x=>x.state).sort(),['busy','replace']);
+ await assert.rejects(()=>prepareCheckoutChoice(prev,annual,'other',deps),/Session invalide/);
+ console.log('PASS: reuse, monthly → yearly, plan switch, concurrent requests, completed payment race, expiration failure, ownership');
+})().catch(e=>{console.error(e);process.exit(1)});
