@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://app.ekolocs.fr'),
   applicationName: 'Ekolocs',
   title: 'Ekolocs — Gestion autonome de vos investissements immobiliers',
-  icons: {icon: [{url: '/ekolocs-icon.svg?v=5', type: 'image/svg+xml', sizes: 'any'}], shortcut: '/ekolocs-icon.svg?v=5', apple: '/ekolocs-logo.jpeg'},
+  icons: {icon: [{url: '/ekolocs-favicon.png?v=6', type: 'image/png', sizes: '32x32'}], shortcut: '/ekolocs-favicon.png?v=6', apple: '/ekolocs-apple-icon.png?v=6'},
   description: 'Gérez vos biens, locataires, quittances et rentabilité en un seul endroit.',
 }
 
