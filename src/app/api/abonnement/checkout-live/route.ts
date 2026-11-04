@@ -1,3 +1,4 @@
+import {prepareCheckoutChoice} from '@/lib/checkoutChoice'
 import {randomUUID} from 'node:crypto'
 import {createClient as createAdminClient} from '@supabase/supabase-js'
 import {NextRequest,NextResponse} from 'next/server'
@@ -34,19 +35,29 @@ export async function POST(req:NextRequest){let stage='access';try{
  if(reservation.state==='busy')return NextResponse.json({error:'Un paiement est en cours de préparation. Réessayez dans un instant.'},{status:409})
  if(reservation.state==='existing'){
  stage='pending_session';
- const pending=await stripeLiveRequest(`checkout/sessions/${encodeURIComponent(reservation.session_id)}`)
- if(pending.status==='open'&&pending.livemode===true&&reservation.plan===selected.id&&reservation.interval===interval)return NextResponse.json({url:reservation.url},{headers:{'Cache-Control':'private, no-store'}})
- return NextResponse.json({error:pending.status==='complete'?'Votre paiement est en cours de synchronisation. Actualisez votre abonnement dans un instant.':'Une session de paiement existe déjà pour une autre formule. Terminez-la ou attendez son expiration (30 minutes maximum).'},{status:409})
+ const sessionPath=`checkout/sessions/${encodeURIComponent(reservation.session_id)}`
+ const choice=await prepareCheckoutChoice(reservation,{plan:selected.id,interval},user.id,{
+ read:()=>stripeLiveRequest(sessionPath),
+ expire:()=>stripeLiveRequest(`${sessionPath}/expire`,new URLSearchParams(),`ekolocs-expire-${reservation.session_id}`),
+ claim:async()=>{
+  const now=new Date()
+  const{data:claimed,error}=await admin.from('billing_checkout_sessions').update({token,lock_until:new Date(now.getTime()+60000).toISOString()}).eq('user_id',user.id).eq('session_id',reservation.session_id).lte('lock_until',now.toISOString()).select('user_id').maybeSingle()
+  if(error)throw Error('Réservation indisponible')
+  return !!claimed
  }
- if(reservation.state!=='reserved')throw Error('Réservation invalide')
+ })
+ if(choice.state==='reuse')return NextResponse.json({url:choice.url},{headers:{'Cache-Control':'private, no-store'}})
+ if(choice.state==='busy')return NextResponse.json({error:'Votre nouveau choix est en cours de préparation. Réessayez dans un instant.'},{status:409})
+ if(choice.state==='complete')return NextResponse.json({error:'Votre paiement est en cours de synchronisation. Actualisez votre abonnement dans un instant.'},{status:409})
+ }else if(reservation.state!=='reserved')throw Error('Réservation invalide')
  const body=new URLSearchParams({mode:'subscription',locale:'fr',client_reference_id:user.id,success_url:`${origin}/dashboard/abonnement?retour=stripe`,cancel_url:`${origin}/dashboard/abonnement`,'line_items[0][quantity]':'1','line_items[0][price]':price,'subscription_data[billing_mode][type]':'flexible','subscription_data[metadata][ekolocs_user_id]':user.id,'subscription_data[metadata][ekolocs_plan]':selected.id,'subscription_data[metadata][ekolocs_interval]':interval,expires_at:String(Math.floor(Date.now()/1000)+1800)})
  if(existing?.stripe_customer_id)body.set('customer',existing.stripe_customer_id);else if(user.email)body.set('customer_email',user.email)
  stage='checkout';
  const result=await stripeLiveRequest('checkout/sessions',body,`ekolocs-live-session-${token}`)
  if(result.livemode!==true||!result.url||new URL(result.url).origin!=='https://checkout.stripe.com')throw Error('Session invalide')
  stage='save_session';
- const {error:saveError}=await admin.from('billing_checkout_sessions').update({session_id:result.id,session_url:result.url,expires_at:new Date(result.expires_at*1000).toISOString(),plan:selected.id,interval,lock_until:new Date().toISOString()}).eq('user_id',user.id).eq('token',token)
- if(saveError)throw Error('Session non enregistrée')
+ const {data:saved,error:saveError}=await admin.from('billing_checkout_sessions').update({session_id:result.id,session_url:result.url,expires_at:new Date(result.expires_at*1000).toISOString(),plan:selected.id,interval,lock_until:new Date().toISOString()}).eq('user_id',user.id).eq('token',token).select('user_id').maybeSingle()
+ if(saveError||!saved)throw Error('Session non enregistrée')
  return NextResponse.json({url:result.url},{headers:{'Cache-Control':'private, no-store'}})
  }catch(error){
  const reference=randomUUID().slice(0,8)
