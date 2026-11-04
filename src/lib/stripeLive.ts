@@ -1,9 +1,17 @@
 import {createHmac,timingSafeEqual} from 'node:crypto'
 export function liveBillingReady(env=process.env){return /^(sk|rk)_live_/.test(env.STRIPE_LIVE_SECRET_KEY||'')&&!!env.STRIPE_LIVE_WEBHOOK_SECRET&&!!env.STRIPE_LIVE_ACCOUNT_ID&&!!env.STRIPE_LIVE_PORTAL_CONFIGURATION&&!!env.SUPABASE_SERVICE_ROLE_KEY&&['ESSENTIEL','PATRIMOINE','INVESTISSEUR'].every(p=>['MONTH','YEAR'].every(i=>!!env[`STRIPE_LIVE_PRICE_${p}_${i}`]))}
+export class StripeLiveError extends Error {
+ constructor(public status:number,public code:string,public requestId:string|null,public permission:string|null){super('Stripe indisponible');this.name='StripeLiveError'}
+}
 export async function stripeLiveRequest(path:string,body?:URLSearchParams,idempotencyKey?:string){
  const key=process.env.STRIPE_LIVE_SECRET_KEY;if(!key||!/^(sk|rk)_live_/.test(key))throw Error('Paiements réels non configurés')
  const r=await fetch(`https://api.stripe.com/v1/${path}`,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${key}`,'Stripe-Version':'2026-09-30.endive',...(body?{'Content-Type':'application/x-www-form-urlencoded'}:{}),...(idempotencyKey?{'Idempotency-Key':idempotencyKey}:{})},body,cache:'no-store',signal:AbortSignal.timeout(15000)})
- const data=await r.json();if(!r.ok)throw Error('Stripe indisponible');return data
+ const data=await r.json();if(!r.ok){
+ // Only retain diagnostic identifiers; never log Stripe bodies, keys or customer data.
+ const code=typeof data.error?.code==='string'&&/^[a-z_]+$/.test(data.error.code)?data.error.code:'api_error'
+ const permission=typeof data.error?.message==='string'?data.error.message.match(/(?:permission[s]?[^a-z_]+)([a-z]+(?:_[a-z]+)+)/i)?.[1]??null:null
+ throw new StripeLiveError(r.status,code,r.headers.get('request-id'),permission)
+ }return data
 }
 export function verifyStripeLiveEvent(raw:string,signature:string,secret:string,now=Date.now()){
  const parts=signature.split(',').map(p=>p.split('=')),timestamp=parts.find(p=>p[0]==='t')?.[1]
