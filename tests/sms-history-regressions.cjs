@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),React=require('react'),{renderToStaticMarkup}=require('react-dom/server'),{loadSource}=require('./source-loader.cjs');
+const lib=loadSource('src/lib/smsHistory.ts'),History=loadSource('src/app/dashboard/sms/SmsHistory.tsx').default;
+const row=(id,campaignId,status,createdAt)=>({id,campaignId,status,createdAt,label:status,last4:'3155',segments:2,hasSid:true,errorCode:status==='undelivered'?'30007':null});
+const old=[row('one','old','undelivered','2026-11-04T12:18:34Z'),row('two','old','delivered','2026-11-04T12:18:34Z')],incoming=[row('three','new','sent','2026-11-06T12:18:34Z')];
+let records=lib.mergeSmsRecords(old,incoming);assert.equal(records.length,3,'A new campaign preserves prior messages');
+records=lib.mergeSmsRecords(records,[{...incoming[0],status:'delivered'}]);assert.equal(records.length,3,'A refresh updates the existing message without duplication');
+const groups=lib.groupSmsHistory(records);assert.equal(groups.length,2);assert.equal(groups[0].id,'new');assert.equal(groups[1].failed,1);assert.equal(groups[1].delivered,1);assert.equal(groups[1].pending,0);
+assert.equal(lib.groupSmsHistory([row('pending','a','sent',null)])[0].delivered,0,'Sent is not delivered');assert.equal(lib.groupSmsHistory([row('unknown','a','unknown',null)])[0].pending,1);
+let html=renderToStaticMarkup(React.createElement(History,{records,activeCampaignId:'new',busy:false,onRefresh:()=>{throw Error('Rendering must never send or refresh')}}));
+assert(html.includes('Campagne en cours de suivi'));assert(html.includes('Historique des campagnes'));assert(html.includes('Code 30007'));assert(html.includes('Actualiser sans renvoyer'));assert(!html.includes('<details open'),'Past campaigns start collapsed');assert.equal((html.match(/sms-history-current/g)||[]).length,1);
+html=renderToStaticMarkup(React.createElement(History,{records:[],activeCampaignId:null,busy:false,onRefresh:()=>{}}));assert(html.includes('Aucun envoi réel enregistré'));
+console.log('SMS history: campaign grouping and ordering, preserved previous messages, refresh deduplication, delivery counts, collapsed archive and empty state: OK');

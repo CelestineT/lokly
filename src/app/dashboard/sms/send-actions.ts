@@ -6,7 +6,7 @@ import {formatLocataireName} from '@/lib/locataireName'
 import {smsDeliveryConfig,smsCampaignHash,validCampaignId} from '@/lib/smsDelivery'
 import {twilioRequest,TWILIO_STATUS_LABELS} from '@/lib/twilioTest'
 export type SmsCampaignInput={id:string;selected:string[];templateId:string;body:string;values:Record<string,string>;overrides:Record<string,Record<string,string>>;confirmed:boolean;revisionChecked:boolean}
-function publicSms(row:any){return{id:row.id,status:row.statut,label:row.statut==='reserved'?'Envoi réservé — pas encore transmis':TWILIO_STATUS_LABELS[row.statut]??row.statut,last4:String(row.telephone??'').slice(-4),segments:Number(row.segments),hasSid:!!row.twilio_sid,errorCode:row.code_erreur??null}}
+function publicSms(row:any){return{id:row.id,campaignId:row.campagne_id??null,createdAt:row.cree_le??null,status:row.statut,label:row.statut==='reserved'?'Envoi réservé — pas encore transmis':TWILIO_STATUS_LABELS[row.statut]??row.statut,last4:String(row.telephone??'').slice(-4),segments:Number(row.segments),hasSid:!!row.twilio_sid,errorCode:row.code_erreur??null}}
 export async function envoyerCampagneSms(input:SmsCampaignInput){
  if(!input||!validCampaignId(input.id)||!input.confirmed||typeof input.templateId!=='string'||input.templateId.length>100||!Array.isArray(input.selected)||!input.selected.length||input.selected.length>50||new Set(input.selected).size!==input.selected.length||input.selected.some(x=>typeof x!=='string'||x.length>100)||typeof input.body!=='string'||input.body.length>1600||JSON.stringify(input).length>60000)return{error:'Vérifiez le message, la confirmation et la sélection (50 locataires maximum).'}
  const s=await createClient(),{data:{user}}=await s.auth.getUser();if(!user)return{error:'Connexion nécessaire.'}
