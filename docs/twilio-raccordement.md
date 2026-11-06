@@ -24,7 +24,7 @@ Ajouter les variables dans l’environnement qui déploie la recette (Preview po
 | TWILIO_ACCOUNT_SID | SID du compte commençant par AC |
 | TWILIO_API_KEY_SID | SID de la clé API commençant par SK |
 | TWILIO_API_KEY_SECRET | Secret de cette clé, conservé uniquement dans Vercel |
-| TWILIO_SMS_FROM | LE BAILLEUR si validé par Twilio, sinon numéro Twilio autorisé au format international |
+| TWILIO_SMS_FROM | BAILLEUR si validé par Twilio, sinon numéro Twilio autorisé au format international |
 | SMS_TEST_TO | Votre numéro de test au format international, par exemple +336… |
 | SMS_TEST_OWNER_IDS | Identifiant(s) des comptes Ekolocs autorisés, séparés par une virgule |
 

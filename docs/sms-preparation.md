@@ -3,7 +3,7 @@
 ## Accès
 Depuis **Communication → Envoyer des SMS**. L’onglet Communication se situe après Documents et avant Paramètres, dans le menu sur ordinateur et sur mobile. URL conservée : `/dashboard/sms`.
 
-Les neuf modèles approuvés sont intégrés au code. L’expéditeur prévu est **LE BAILLEUR** (11 caractères). Aucun nouveau SQL, compte SMS ou secret n’est requis pour la simulation.
+Les neuf modèles approuvés sont intégrés au code. L’expéditeur prévu est **BAILLEUR** (8 caractères). Aucun nouveau SQL, compte SMS ou secret n’est requis pour la simulation.
 
 ## Tester
 1. Choisir un modèle ; son texte est modifiable pour cette préparation.
@@ -23,3 +23,10 @@ Choisir le prestataire (Twilio, Brevo ou autre), vérifier ses règles France, v
 
 ## Validation
 `node tests/sms-preparation-regressions.cjs` : neuf modèles, limites de segments, Unicode/emoji, champs personnalisés, dates et montants, numéros partagés, authentification et périmètre propriétaire, absence d’appel fournisseur.
+
+
+## Mise à jour du 6 novembre 2026
+
+L’expéditeur de l’application et `TWILIO_SMS_FROM` sont alignés sur **BAILLEUR**, à la demande du propriétaire. Le succès d’un test antérieur ne garantit pas la remise chez tous les opérateurs. Aucun SMS n’est envoyé par un déploiement ou un changement de configuration.
+
+Le suivi regroupe les envois récents par campagne : date (heure de Paris), nombre de SMS affichés, réceptions confirmées, échecs/annulations et suivis en cours. Les campagnes précédentes sont repliées ; la campagne démarrée dans la session reste visible. « Actualiser sans renvoyer » reste accessible dans chaque campagne. Un nouveau résultat est fusionné avec les autres campagnes sans effacer leur affichage. La requête conserve la limite existante de 50 SMS au chargement ; aucune donnée n’est supprimée.
